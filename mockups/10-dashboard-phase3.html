@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stryde — Overview (Phase 3)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --accent:        #F97316;
+      --accent-light:  #FED7AA;
+      --accent-dim:    #C2410C;
+      --gray-0:        #FFFFFF;
+      --gray-50:       #F9F9F9;
+      --gray-100:      #F0F0F0;
+      --gray-200:      #E0E0E0;
+      --gray-400:      #9E9E9E;
+      --gray-600:      #5E5E5E;
+      --gray-900:      #111111;
+      --status-green:  #22C55E;
+      --status-amber:  #F59E0B;
+      --status-red:    #EF4444;
+
+      --text-xs:   11px;
+      --text-sm:   13px;
+      --text-base: 15px;
+      --text-lg:   17px;
+      --text-xl:   22px;
+      --text-2xl:  28px;
+      --text-3xl:  36px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--gray-0);
+      color: var(--gray-900);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: var(--text-base);
+      padding-bottom: 80px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .page-enter { animation: fadeUp 220ms ease-out both; }
+
+    @keyframes arcDraw {
+      from { stroke-dashoffset: 283; }
+      to   { stroke-dashoffset: var(--target-offset); }
+    }
+    .readiness-arc { animation: arcDraw 900ms ease-out forwards; }
+
+    @keyframes drawStroke {
+      from { stroke-dashoffset: 300; }
+      to   { stroke-dashoffset: 0; }
+    }
+    .sparkline-path {
+      stroke-dasharray: 300;
+      stroke-dashoffset: 300;
+      animation: drawStroke 600ms ease-out forwards;
+    }
+
+    @keyframes barFill {
+      from { width: 0; }
+      to   { width: var(--target-w); }
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      animation: barFill 700ms ease-out forwards;
+    }
+
+    @keyframes lineFade {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .brief-line { animation: lineFade 200ms ease-out both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    @media (min-width: 768px) {
+      .container { max-width: 900px; padding: 0 32px; }
+    }
+
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card-full { grid-column: 1 / -1; }
+    .card-half { grid-column: span 1; }
+
+    .card {
+      background: var(--gray-50);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .label-xs {
+      font-size: var(--text-xs);
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Workout type colour map */
+    .wt-easy     { background: #E8F5E9; color: #2E7D32; }
+    .wt-tempo    { background: #FFF3E0; color: #E65100; }
+    .wt-long     { background: #E3F2FD; color: #1565C0; }
+    .wt-interval { background: #FCE4EC; color: #AD1457; }
+    .wt-rest     { background: var(--gray-100); color: var(--gray-600); }
+    .wt-race     { background: #F3E5F5; color: #6A1B9A; }
+
+    .workout-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .activity-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .activity-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .activity-row:first-child { padding-top: 0; }
+
+    /* Tab bar */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--gray-0);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 -1px 0 var(--gray-100);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .tab-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 3px;
+      color: var(--gray-400); font-size: var(--text-xs);
+      cursor: pointer; padding: 6px 12px;
+    }
+    .tab-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div style="padding: 52px 16px 20px; max-width:480px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <p class="label-xs" style="margin-bottom:4px;">Thursday, 20 Mar 2025</p>
+        <h1 style="font-size:var(--text-xl); font-weight:600;">Good morning, Faizal</h1>
+      </div>
+      <div style="width:38px; height:38px; border-radius:50%; background:var(--accent-light); display:flex; align-items:center; justify-content:center; font-weight:600; color:var(--accent); font-size:var(--text-sm);">MF</div>
+    </div>
+  </div>
+
+  <div class="container page-enter" style="display:flex; flex-direction:column; gap:24px;">
+
+    <!-- ── READINESS HERO ── -->
+    <div class="card card-full" style="position:relative; overflow:hidden;">
+      <div style="position:absolute; top:-40px; right:-40px; width:160px; height:160px; background:var(--accent-light); border-radius:50%; opacity:0.35; pointer-events:none;"></div>
+      <div style="position:relative; display:flex; align-items:flex-start; gap:20px;">
+        <!-- Ring -->
+        <div style="flex-shrink:0; position:relative; width:88px; height:88px;">
+          <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg);">
+            <circle cx="44" cy="44" r="38" fill="none" stroke="var(--gray-100)" stroke-width="7"/>
+            <circle class="readiness-arc" cx="44" cy="44" r="38" fill="none" stroke="var(--accent)" stroke-width="7"
+              stroke-dasharray="283" style="--target-offset:54;" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <span style="font-size:var(--text-2xl); font-weight:600; line-height:1;">81</span>
+            <span style="font-size:9px; color:var(--gray-400);">/100</span>
+          </div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div class="label-xs" style="margin-bottom:2px;">Readiness</div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--status-green); margin-bottom:10px;">Optimal today</div>
+          <div style="display:flex; flex-direction:column; gap:5px;">
+            <div class="brief-line" style="display:flex; gap:7px; animation-delay:150ms;">
+              <span style="color:var(--accent); font-size:var(--text-xs); flex-shrink:0; margin-top:2px;">•</span>
+              <span style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">HRV 59ms is +7% above your baseline — excellent recovery after yesterday's easy run.</span>
+            </div>
+            <div class="brief-line" style="display:flex; gap:7px; animation-delay:300ms;">
+              <span style="color:var(--accent); font-size:var(--text-xs); flex-shrink:0; margin-top:2px;">•</span>
+              <span style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">Today's threshold session is well-timed. Hit your 5:28–5:40/km target with confidence.</span>
+            </div>
+            <div class="brief-line" style="display:flex; gap:7px; animation-delay:450ms;">
+              <span style="color:var(--accent); font-size:var(--text-xs); flex-shrink:0; margin-top:2px;">•</span>
+              <span style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">Tip: Run before 7:30am — apparent temp rises to 34°C by 9am. Carry 500ml per 45 min.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--gray-100); display:flex; justify-content:space-between;">
+        <span style="font-size:var(--text-xs); color:var(--gray-400);">Generated 6:01 am · Gemini 2.5 Flash</span>
+        <a href="08-health.html" style="font-size:var(--text-xs); color:var(--accent); font-weight:600; text-decoration:none;">Health →</a>
+      </div>
+    </div>
+
+    <!-- ── NEXT WORKOUT CARD (Phase 3 addition) ── -->
+    <div>
+      <p class="label-xs" style="margin-bottom:12px;">Today's workout</p>
+      <div class="card card-full" style="border:1.5px solid var(--accent-light);">
+        <div style="display:flex; align-items:flex-start; gap:14px;">
+          <div style="width:46px; height:46px; border-radius:14px; background:var(--accent-light); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">⚡</div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px;">
+              <div>
+                <div style="font-size:var(--text-base); font-weight:600; color:var(--gray-900);">Threshold tempo run</div>
+                <span class="workout-badge wt-tempo" style="margin-top:4px; display:inline-block;">Tempo</span>
+              </div>
+              <a href="11-training-calendar.html" style="font-size:var(--text-xs); color:var(--accent); font-weight:600; text-decoration:none; flex-shrink:0; margin-top:2px;">View plan →</a>
+            </div>
+
+            <!-- Stats row -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px;">
+              <div>
+                <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">10 km</div>
+                <div style="font-size:var(--text-xs); color:var(--gray-400);">Distance</div>
+              </div>
+              <div>
+                <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">5:28–5:40</div>
+                <div style="font-size:var(--text-xs); color:var(--gray-400);">/km target</div>
+              </div>
+              <div>
+                <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">Z3–Z4</div>
+                <div style="font-size:var(--text-xs); color:var(--gray-400);">HR zone</div>
+              </div>
+            </div>
+
+            <div style="margin-top:12px; padding:10px 12px; background:var(--gray-0); border-radius:10px; border:1px solid var(--gray-100);">
+              <p style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">
+                2km warm-up Z1 → 6km at threshold pace (5:28–5:40/km, HR 155–165) → 2km cool-down Z1. RPE target: 7–8/10.
+              </p>
+            </div>
+
+            <!-- Race countdown context -->
+            <div style="margin-top:10px; display:flex; align-items:center; gap:6px;">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="var(--gray-400)" stroke-width="1.2"/><path d="M6 3.5v2.5l1.5 1" stroke="var(--gray-400)" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">108 days to KL Marathon · Week 14 of 24 · Build phase</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── THIS WEEK AT A GLANCE (Phase 3 addition) ── -->
+    <div>
+      <p class="label-xs" style="margin-bottom:12px;">This week</p>
+      <div class="card card-full">
+        <!-- Mileage progress -->
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+          <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">47.2 km</span>
+          <span style="font-size:var(--text-xs); color:var(--gray-400);">of 55 km goal</span>
+        </div>
+        <div style="height:6px; background:var(--gray-100); border-radius:4px; overflow:hidden; margin-bottom:16px;">
+          <div class="bar-fill" style="--target-w:86%; background:var(--accent);"></div>
+        </div>
+
+        <!-- Day-by-day workout strip -->
+        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+          <!-- Mon: easy ✓ -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">M</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:#E8F5E9; position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px;">✓</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-600);">Easy</span>
+          </div>
+          <!-- Tue: tempo ✓ -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">T</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:#E8F5E9; position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px;">✓</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-600);">Tempo</span>
+          </div>
+          <!-- Wed: easy ✓ -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">W</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:#E8F5E9; position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px;">✓</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-600);">Easy</span>
+          </div>
+          <!-- Thu: TODAY — pending -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--accent); text-transform:uppercase; font-weight:600;">T</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:var(--accent-light); border:2px solid var(--accent); position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px;">⚡</span>
+            </div>
+            <span style="font-size:9px; color:var(--accent); font-weight:600;">Today</span>
+          </div>
+          <!-- Fri: rest -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">F</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:var(--gray-100); position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--gray-400);">–</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-400);">Rest</span>
+          </div>
+          <!-- Sat: easy (upcoming) -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">S</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:var(--gray-100); border:1.5px dashed var(--gray-200); position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--gray-400);">🏃</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-400);">Easy</span>
+          </div>
+          <!-- Sun: long run (upcoming) -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <span style="font-size:9px; color:var(--gray-400); text-transform:uppercase;">S</span>
+            <div style="width:100%; padding-top:100%; border-radius:8px; background:var(--gray-100); border:1.5px dashed var(--gray-200); position:relative;">
+              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--gray-400);">🏅</span>
+            </div>
+            <span style="font-size:9px; color:var(--gray-400);">Long</span>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-top:12px; padding-top:12px; border-top:1px solid var(--gray-100);">
+          <span style="font-size:var(--text-xs); color:var(--gray-600);">3 of 5 runs done</span>
+          <a href="11-training-calendar.html" style="font-size:var(--text-xs); color:var(--accent); font-weight:600; text-decoration:none;">Full calendar →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HRV + SLEEP SPARKLINES ── -->
+    <div>
+      <p class="label-xs" style="margin-bottom:12px;">14-day trends</p>
+      <div class="card-grid">
+        <div class="card card-half">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="label-xs">HRV</span>
+            <span style="font-size:var(--text-xs); color:var(--status-green); font-weight:600;">↑ 7%</span>
+          </div>
+          <div style="font-size:var(--text-xl); font-weight:600;">59 ms</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">baseline 55</div>
+          <div style="margin-top:10px; height:32px;">
+            <svg width="100%" height="32" viewBox="0 0 120 32" preserveAspectRatio="none">
+              <line x1="0" y1="12" x2="120" y2="12" stroke="var(--gray-200)" stroke-width="1" stroke-dasharray="3 3"/>
+              <polyline class="sparkline-path"
+                points="0,14 9,11 18,10 27,12 36,9 45,13 54,15 63,11 72,13 81,16 90,18 99,17 110,15 120,9"
+                fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="120" cy="9" r="3" fill="var(--accent)"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card card-half">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span class="label-xs">SLEEP</span>
+            <span style="font-size:var(--text-xs); color:var(--status-green); font-weight:600;">↑ 4%</span>
+          </div>
+          <div style="font-size:var(--text-xl); font-weight:600;">76</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">score · 7h 28m</div>
+          <div style="margin-top:10px; height:32px;">
+            <svg width="100%" height="32" viewBox="0 0 120 32" preserveAspectRatio="none">
+              <line x1="0" y1="14" x2="120" y2="14" stroke="var(--gray-200)" stroke-width="1" stroke-dasharray="3 3"/>
+              <polyline class="sparkline-path"
+                points="0,18 9,20 18,22 27,17 36,15 45,19 54,21 63,16 72,14 81,12 90,15 99,13 110,11 120,10"
+                fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                style="animation-delay:100ms;"/>
+              <circle cx="120" cy="10" r="3" fill="#3B82F6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RECENT ACTIVITIES ── -->
+    <div>
+      <div class="card card-full">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span class="label-xs">Recent</span>
+          <a href="04-activities.html" style="font-size:var(--text-xs); color:var(--accent); font-weight:600; text-decoration:none;">See all →</a>
+        </div>
+        <div class="activity-row">
+          <div style="width:34px; height:34px; border-radius:10px; background:var(--accent-light); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;">🏃</div>
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+              <span style="font-size:var(--text-sm); font-weight:600;">Easy morning run</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">Wed</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="font-size:var(--text-xs); color:var(--gray-600);">12.3 km</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">6:12/km · 142 bpm</span>
+            </div>
+          </div>
+        </div>
+        <div class="activity-row">
+          <div style="width:34px; height:34px; border-radius:10px; background:#E0F2FE; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;">⚡</div>
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+              <span style="font-size:var(--text-sm); font-weight:600;">Tempo intervals</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">Tue</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="font-size:var(--text-xs); color:var(--gray-600);">10.0 km</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">5:28/km · 158 bpm</span>
+            </div>
+          </div>
+        </div>
+        <div class="activity-row">
+          <div style="width:34px; height:34px; border-radius:10px; background:#F0FDF4; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px;">🏅</div>
+          <div style="flex:1;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+              <span style="font-size:var(--text-sm); font-weight:600;">Long run — Penang Hill</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">Sun</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="font-size:var(--text-xs); color:var(--gray-600);">26.0 km</span>
+              <span style="font-size:var(--text-xs); color:var(--gray-400);">6:38/km · 141 bpm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <div class="tab-item active">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="12" y="3" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="3" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="12" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/></svg>
+      <span>Overview</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 17V9l7-5 7 5v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="13" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Training</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4a7 7 0 1 0 0 14A7 7 0 0 0 11 4z" stroke="currentColor" stroke-width="1.6"/><path d="M11 8v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Health</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="3,15 7,9 11,12 15,6 19,10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Analysis</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+
+</body>
+</html>

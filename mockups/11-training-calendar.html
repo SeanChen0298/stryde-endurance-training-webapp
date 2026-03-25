@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stryde — Training Calendar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --accent:        #F97316;
+      --accent-light:  #FED7AA;
+      --accent-dim:    #C2410C;
+      --gray-0:        #FFFFFF;
+      --gray-50:       #F9F9F9;
+      --gray-100:      #F0F0F0;
+      --gray-200:      #E0E0E0;
+      --gray-400:      #9E9E9E;
+      --gray-600:      #5E5E5E;
+      --gray-900:      #111111;
+      --status-green:  #22C55E;
+      --status-amber:  #F59E0B;
+      --status-red:    #EF4444;
+
+      --text-xs:   11px;
+      --text-sm:   13px;
+      --text-base: 15px;
+      --text-lg:   17px;
+      --text-xl:   22px;
+      --text-2xl:  28px;
+      --text-3xl:  36px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--gray-0);
+      color: var(--gray-900);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: var(--text-base);
+      padding-bottom: 80px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .page-enter { animation: fadeUp 220ms ease-out both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    @media (min-width: 768px) {
+      .container { max-width: 900px; padding: 0 32px; }
+    }
+
+    .label-xs {
+      font-size: var(--text-xs);
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* View toggle */
+    .view-toggle {
+      display: flex;
+      background: var(--gray-100);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .vtab {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      border-radius: 8px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--gray-600);
+      transition: all 150ms ease;
+    }
+    .vtab.active {
+      background: var(--gray-0);
+      color: var(--gray-900);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Week navigation */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .nav-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--gray-50);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gray-600);
+      transition: background 120ms ease;
+    }
+    .nav-btn:hover { background: var(--gray-100); }
+
+    /* Workout card */
+    .workout-card {
+      background: var(--gray-50);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: opacity 100ms ease;
+      border-left: 3px solid transparent;
+    }
+    .workout-card:active { opacity: 0.8; }
+    .workout-card.easy       { border-left-color: #4CAF50; }
+    .workout-card.tempo      { border-left-color: #FF9800; }
+    .workout-card.long_run   { border-left-color: #2196F3; }
+    .workout-card.interval   { border-left-color: #E91E63; }
+    .workout-card.rest       { border-left-color: var(--gray-200); }
+    .workout-card.today-card { box-shadow: 0 0 0 2px var(--accent); }
+    .workout-card.missed     { border-left-color: var(--status-red); opacity: 0.75; }
+
+    .wk-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-easy     { background: #E8F5E9; color: #2E7D32; }
+    .badge-tempo    { background: #FFF3E0; color: #E65100; }
+    .badge-long     { background: #E3F2FD; color: #1565C0; }
+    .badge-interval { background: #FCE4EC; color: #AD1457; }
+    .badge-rest     { background: var(--gray-100); color: var(--gray-600); }
+
+    /* Completed overlay bar */
+    .actual-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: var(--gray-100);
+      border-radius: 8px;
+    }
+
+    /* Day header in week view */
+    .day-header {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 20px 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .day-header.today { color: var(--accent); }
+    .day-dot-today {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* Revision alert banner */
+    .revision-banner {
+      background: #FFF7ED;
+      border: 1px solid var(--accent-light);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    /* Workout detail drawer (bottom sheet) */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+    .drawer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--gray-0);
+      border-radius: 20px 20px 0 0;
+      padding: 20px 20px 40px;
+      z-index: 201;
+      transform: translateY(100%);
+      transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .drawer.open { transform: translateY(0); }
+
+    .drawer-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--gray-200);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+
+    /* Tab bar */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--gray-0);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 -1px 0 var(--gray-100);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .tab-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 3px;
+      color: var(--gray-400); font-size: var(--text-xs);
+      cursor: pointer; padding: 6px 12px;
+    }
+    .tab-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div style="padding: 52px 16px 16px; max-width:480px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h1 style="font-size:var(--text-xl); font-weight:600;">Training</h1>
+      <a href="12-training-plan.html" style="font-size:var(--text-xs); color:var(--accent); font-weight:600; text-decoration:none;">Plan summary →</a>
+    </div>
+
+    <!-- View toggle: Week / Month -->
+    <div class="view-toggle">
+      <div class="vtab active" onclick="setView('week', this)">Week</div>
+      <div class="vtab" onclick="setView('month', this)">Month</div>
+    </div>
+  </div>
+
+  <div class="container page-enter">
+
+    <!-- ── PLAN REVISION ALERT ── -->
+    <div class="revision-banner">
+      <div style="font-size:18px; line-height:1; flex-shrink:0;">🔄</div>
+      <div>
+        <div style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900); margin-bottom:3px;">Plan revised this morning</div>
+        <div style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">
+          Saturday's 20km long run moved to Sunday. Replaced with an additional easy run (8km) to allow recovery after today's hard session. HRV trend and training load were factors.
+        </div>
+        <div style="margin-top:8px; font-size:var(--text-xs); color:var(--gray-400);">6:07 am · by Gemini 2.5 Flash</div>
+      </div>
+    </div>
+
+    <!-- ── WEEK NAVIGATION ── -->
+    <div class="week-nav">
+      <button class="nav-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div style="text-align:center;">
+        <div style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">17 – 23 Mar 2025</div>
+        <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">Week 14 of 24 · Build phase</div>
+      </div>
+      <button class="nav-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <!-- ── WEEK VIEW ── -->
+    <div id="weekView">
+
+      <!-- MON 17 — completed easy -->
+      <div class="day-header">Mon 17 Mar</div>
+      <div class="workout-card easy" onclick="openDrawer('easy')">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-easy">Easy</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Easy aerobic run</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">12 km · Z2 · 6:10–6:30/km</div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:var(--status-green); flex-shrink:0;"><path d="M2 7l3.5 3.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <!-- Actual -->
+        <div class="actual-bar">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6l3 3L11 2" stroke="var(--status-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:var(--text-xs); color:var(--gray-600);">12.0 km · 6:14/km · 138 bpm avg</span>
+        </div>
+      </div>
+
+      <!-- TUE 18 — completed tempo -->
+      <div class="day-header">Tue 18 Mar</div>
+      <div class="workout-card tempo" onclick="openDrawer('tempo')">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-tempo">Tempo</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Threshold tempo run</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">10 km · Z3–Z4 · 5:28–5:40/km</div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:var(--status-green); flex-shrink:0;"><path d="M2 7l3.5 3.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="actual-bar">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6l3 3L11 2" stroke="var(--status-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:var(--text-xs); color:var(--gray-600);">10.0 km · 5:32/km · 156 bpm avg</span>
+        </div>
+      </div>
+
+      <!-- WED 19 — completed easy -->
+      <div class="day-header">Wed 19 Mar</div>
+      <div class="workout-card easy">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-easy">Easy</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Easy morning run</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">12 km · Z2 · 6:10–6:30/km</div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:var(--status-green); flex-shrink:0;"><path d="M2 7l3.5 3.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="actual-bar">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6l3 3L11 2" stroke="var(--status-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span style="font-size:var(--text-xs); color:var(--gray-600);">12.3 km · 6:12/km · 142 bpm avg</span>
+        </div>
+      </div>
+
+      <!-- THU 20 — TODAY, pending -->
+      <div class="day-header today">
+        <div class="day-dot-today"></div>
+        Thu 20 Mar · Today
+      </div>
+      <div class="workout-card tempo today-card" onclick="openDrawer('tempo-today')">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-tempo">Tempo</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Threshold tempo run</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">10 km · Z3–Z4 · 5:28–5:40/km</div>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--accent); font-weight:600; background:var(--accent-light); padding:3px 8px; border-radius:6px; flex-shrink:0;">Up next</span>
+        </div>
+        <!-- Description -->
+        <div style="margin-top:8px; font-size:var(--text-xs); color:var(--gray-600); line-height:1.5; padding:8px 10px; background:var(--gray-0); border-radius:8px; border:1px solid var(--gray-100);">
+          2km warm-up Z1 → 6km at threshold (5:28–5:40/km, HR 155–165) → 2km cool-down Z1. RPE 7–8.
+        </div>
+        <!-- Garmin sync indicator -->
+        <div style="margin-top:8px; display:flex; align-items:center; gap:6px;">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1a5 5 0 1 0 0 10A5 5 0 0 0 6 1zm2.5 5.5H6.5V9h-1V6.5H3v-1h2.5V3h1v2.5H8.5v1z" fill="var(--gray-400)"/></svg>
+          <span style="font-size:var(--text-xs); color:var(--gray-400);">Synced to Garmin device</span>
+        </div>
+      </div>
+
+      <!-- FRI 21 — rest -->
+      <div class="day-header">Fri 21 Mar</div>
+      <div class="workout-card rest">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:20px;">😴</span>
+          <div>
+            <span class="wk-badge badge-rest">Rest</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Rest day</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">No running · active recovery OK (walk, stretch)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAT 22 — revised: now easy 8km (was 20km long run) -->
+      <div class="day-header">
+        Sat 22 Mar
+        <span style="font-size:9px; background:#FEF3C7; color:#92400E; padding:2px 6px; border-radius:4px; font-weight:600; letter-spacing:0.02em;">REVISED</span>
+      </div>
+      <div class="workout-card easy">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-easy">Easy</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Easy run (revised from long run)</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">8 km · Z1–Z2 · 6:20–6:40/km</div>
+          </div>
+        </div>
+        <div style="margin-top:8px; font-size:var(--text-xs); color:var(--status-amber); padding:6px 8px; background:#FEF3C7; border-radius:8px;">
+          Long run moved to Sunday — recovery priority after back-to-back quality sessions this week.
+        </div>
+      </div>
+
+      <!-- SUN 23 — long run (moved from Sat) -->
+      <div class="day-header">Sun 23 Mar</div>
+      <div class="workout-card long_run">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span class="wk-badge badge-long">Long run</span>
+            <div style="font-size:var(--text-sm); font-weight:600; margin-top:5px;">Long run — Batu Ferringhi loop</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-600); margin-top:2px;">26 km · Z1–Z2 · 6:30–6:50/km</div>
+          </div>
+        </div>
+        <div style="margin-top:8px; font-size:var(--text-xs); color:var(--gray-600); padding:8px 10px; background:var(--gray-0); border-radius:8px; border:1px solid var(--gray-100); line-height:1.5;">
+          Focus: conversational pace throughout. HR must stay below 148 bpm. Carry 600ml water + 2 gels (at 14km and 21km). Start before 6:30am.
+        </div>
+      </div>
+
+    </div><!-- end weekView -->
+
+    <!-- ── WEEK SUMMARY ── -->
+    <div style="background:var(--gray-50); border-radius:16px; padding:16px; margin-top:4px;">
+      <div style="font-size:var(--text-xs); font-weight:600; color:var(--gray-400); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px;">Week totals (projected)</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">80 km</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Distance</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">9h 02m</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Time on feet</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-900);">6 runs</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Sessions</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── WORKOUT DETAIL DRAWER ── -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawerPanel">
+    <div class="drawer-handle"></div>
+    <div id="drawerContent">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="12" y="3" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="3" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="12" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/></svg>
+      <span>Overview</span>
+    </div>
+    <div class="tab-item active">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 17V9l7-5 7 5v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="13" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Training</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4a7 7 0 1 0 0 14A7 7 0 0 0 11 4z" stroke="currentColor" stroke-width="1.6"/><path d="M11 8v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Health</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="3,15 7,9 11,12 15,6 19,10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Analysis</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+
+  <script>
+    function setView(v, el) {
+      document.querySelectorAll('.vtab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    const drawerData = {
+      'easy': {
+        title: 'Easy aerobic run',
+        badge: '<span class="wk-badge badge-easy">Easy</span>',
+        meta: '12 km · Zone 2 · 6:10–6:30/km · RPE 4–5',
+        desc: 'Conversational effort throughout. Stay in Zone 2 (HR 128–145 bpm). Focus on consistent rhythm and keeping shoulders relaxed. Run any familiar flat-to-rolling route.',
+        status: '<div style="display:flex;align-items:center;gap:6px;color:var(--status-green);"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:var(--text-sm);font-weight:600;">Completed</span></div>',
+      },
+      'tempo': {
+        title: 'Threshold tempo run',
+        badge: '<span class="wk-badge badge-tempo">Tempo</span>',
+        meta: '10 km · Zone 3–4 · 5:28–5:40/km · RPE 7–8',
+        desc: 'Structure: 2km easy warm-up (Z1), 6km at threshold pace (5:28–5:40/km, HR 150–162 bpm), 2km cool-down (Z1). This should feel "comfortably hard" — you can speak a few words but not hold a conversation.',
+        status: '<div style="display:flex;align-items:center;gap:6px;color:var(--status-green);"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:var(--text-sm);font-weight:600;">Completed · 10.0 km · 5:32/km</span></div>',
+      },
+      'tempo-today': {
+        title: 'Threshold tempo run',
+        badge: '<span class="wk-badge badge-tempo">Tempo</span>',
+        meta: '10 km · Zone 3–4 · 5:28–5:40/km · RPE 7–8',
+        desc: 'Structure: 2km easy warm-up (Z1), 6km at threshold pace (5:28–5:40/km, HR 155–165 bpm), 2km cool-down (Z1). Your HRV of 59ms (+7% above baseline) signals this is the right day to hit quality work — you have the physiological green light.',
+        status: '<div style="display:flex;align-items:center;gap:6px;color:var(--accent);"><span style="font-size:var(--text-sm);font-weight:600;background:var(--accent-light);padding:4px 10px;border-radius:6px;">Up next today</span></div>',
+      },
+    };
+
+    function openDrawer(type) {
+      const d = drawerData[type];
+      if (!d) return;
+      document.getElementById('drawerContent').innerHTML = `
+        <div style="margin-bottom:6px;">${d.badge}</div>
+        <div style="font-size:var(--text-xl);font-weight:600;color:var(--gray-900);margin-bottom:4px;">${d.title}</div>
+        <div style="font-size:var(--text-xs);color:var(--gray-600);margin-bottom:16px;">${d.meta}</div>
+        <p style="font-size:var(--text-sm);color:var(--gray-600);line-height:1.6;margin-bottom:16px;">${d.desc}</p>
+        ${d.status}
+      `;
+      document.getElementById('drawerOverlay').classList.add('open');
+      document.getElementById('drawerPanel').classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.getElementById('drawerPanel').classList.remove('open');
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stryde — Activities</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --accent:        #F97316;
+      --accent-light:  #FED7AA;
+      --accent-dim:    #C2410C;
+      --gray-0:        #FFFFFF;
+      --gray-50:       #F9F9F9;
+      --gray-100:      #F0F0F0;
+      --gray-200:      #E0E0E0;
+      --gray-400:      #9E9E9E;
+      --gray-600:      #5E5E5E;
+      --gray-900:      #111111;
+      --status-green:  #22C55E;
+      --status-amber:  #F59E0B;
+      --status-red:    #EF4444;
+
+      --text-xs:   11px;
+      --text-sm:   13px;
+      --text-base: 15px;
+      --text-lg:   17px;
+      --text-xl:   22px;
+      --text-2xl:  28px;
+      --text-3xl:  36px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--gray-0);
+      color: var(--gray-900);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: var(--text-base);
+      padding-bottom: 80px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .page-enter { animation: fadeUp 220ms ease-out both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    @media (min-width: 768px) {
+      .container { max-width: 900px; padding: 0 32px; }
+    }
+
+    .label-xs {
+      font-size: var(--text-xs);
+      font-weight: 400;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Filter chips */
+    .filter-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    .filter-chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      border-radius: 20px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 1.5px solid var(--gray-200);
+      background: var(--gray-0);
+      color: var(--gray-600);
+      transition: all 150ms ease;
+      letter-spacing: 0.02em;
+    }
+    .chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .chip:not(.active):hover {
+      border-color: var(--gray-400);
+      color: var(--gray-900);
+    }
+
+    /* Month divider */
+    .month-divider {
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 16px 0 8px;
+    }
+
+    /* Activity card */
+    .activity-card {
+      background: var(--gray-50);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: opacity 100ms ease;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .activity-card:active { opacity: 0.8; transform: scale(0.98); }
+
+    .activity-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .workout-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .stat-value {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--gray-900);
+    }
+
+    .stat-label {
+      font-size: var(--text-xs);
+      color: var(--gray-400);
+    }
+
+    /* Source badge */
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: var(--text-xs);
+      color: var(--gray-400);
+      margin-top: 6px;
+    }
+
+    /* Summary card at top */
+    .summary-card {
+      background: var(--gray-50);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      margin-bottom: 24px;
+    }
+
+    .summary-stat {
+      text-align: center;
+      padding: 0 8px;
+      border-right: 1px solid var(--gray-200);
+    }
+    .summary-stat:last-child { border-right: none; }
+
+    /* Tab bar */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--gray-0);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 -1px 0 var(--gray-100);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--gray-400);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      padding: 6px 12px;
+    }
+    .tab-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- Top header -->
+  <div style="padding: 52px 16px 16px; max-width:480px; margin:0 auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h1 style="font-size:var(--text-xl); font-weight:600; color:var(--gray-900);">Activities</h1>
+      <span style="font-size:var(--text-xs); color:var(--gray-400); font-weight:400;">847 total</span>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filter-chips">
+      <div class="chip active" onclick="setFilter(this)">All</div>
+      <div class="chip" onclick="setFilter(this)">🏃 Run</div>
+      <div class="chip" onclick="setFilter(this)">⚡ Tempo</div>
+      <div class="chip" onclick="setFilter(this)">🏅 Long run</div>
+      <div class="chip" onclick="setFilter(this)">🔁 Intervals</div>
+      <div class="chip" onclick="setFilter(this)">🌙 Recovery</div>
+    </div>
+  </div>
+
+  <div class="container page-enter">
+
+    <!-- Monthly summary -->
+    <div class="summary-card">
+      <div class="summary-stat">
+        <div style="font-size:var(--text-xl); font-weight:600; color:var(--gray-900);">187</div>
+        <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">km Mar</div>
+      </div>
+      <div class="summary-stat">
+        <div style="font-size:var(--text-xl); font-weight:600; color:var(--gray-900);">14</div>
+        <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">runs</div>
+      </div>
+      <div class="summary-stat">
+        <div style="font-size:var(--text-xl); font-weight:600; color:var(--gray-900);">22h 4m</div>
+        <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">time</div>
+      </div>
+    </div>
+
+    <!-- ── MARCH 2025 ── -->
+    <div class="month-divider">March 2025</div>
+
+    <!-- Activity: Easy run today -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:var(--accent-light);">🏃</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">Easy morning run</span>
+            <span class="workout-badge" style="background:var(--gray-100); color:var(--gray-600); margin-left:8px;">Easy</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Wed 19 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">12.3 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">6:12/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">142 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">1h 16m</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Activity: Tempo intervals -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:#E0F2FE;">⚡</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">Tempo intervals — Botanical Gardens</span>
+            <span class="workout-badge" style="background:#FFF3E0; color:#E65100; margin-left:8px;">Tempo</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Tue 18 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">10.0 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">5:28/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">158 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">54m 40s</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Activity: Rest day (Mon) — no card -->
+
+    <!-- Activity: Long run -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:#F0FDF4;">🏅</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">Long run — Penang Hill loop</span>
+            <span class="workout-badge" style="background:#F0FDF4; color:#166534; margin-left:8px;">Long run</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Sun 16 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">24.8 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">6:41/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">139 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">2h 46m</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Activity: Easy run Sat -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:var(--accent-light);">🏃</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">Easy run — Gurney Drive</span>
+            <span class="workout-badge" style="background:var(--gray-100); color:var(--gray-600); margin-left:8px;">Easy</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Sat 15 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">8.5 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">6:28/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">136 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">54m 58s</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Activity: Intervals Fri -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:#FFF0F0;">🔁</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">5×1km intervals</span>
+            <span class="workout-badge" style="background:#FEF2F2; color:#B91C1C; margin-left:8px;">Intervals</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Fri 14 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">9.2 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">5:04/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">163 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">46m 41s</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Activity: Recovery Thu -->
+    <div class="activity-card">
+      <div class="activity-icon" style="background:#F5F3FF;">🌙</div>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <span style="font-size:var(--text-sm); font-weight:600; color:var(--gray-900);">Recovery jog</span>
+            <span class="workout-badge" style="background:#F5F3FF; color:#5B21B6; margin-left:8px;">Recovery</span>
+          </div>
+          <span style="font-size:var(--text-xs); color:var(--gray-400); flex-shrink:0; margin-left:8px;">Thu 13 Mar</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-value">6.2 km</span>
+            <span class="stat-label">Distance</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">6:58/km</span>
+            <span class="stat-label">Avg pace</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">128 bpm</span>
+            <span class="stat-label">Avg HR</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">43m 11s</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="source-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L2 5.5h2L2.5 9l5-5H5L7 1z" fill="#FC4C02"/></svg>
+          Strava
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0; margin-top:2px; color:var(--gray-200);">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Load more -->
+    <button
+      style="width:100%; background:var(--gray-50); border:none; border-radius:12px; padding:13px; font-size:var(--text-sm); font-weight:600; color:var(--gray-600); cursor:pointer; margin-top:8px; transition:background 150ms ease;"
+      onmouseover="this.style.background='var(--gray-100)'"
+      onmouseout="this.style.background='var(--gray-50)'"
+    >
+      Load more activities
+    </button>
+
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="12" y="3" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="3" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="12" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/></svg>
+      <span>Overview</span>
+    </div>
+    <div class="tab-item active">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 17V9l7-5 7 5v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="13" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Training</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4a7 7 0 1 0 0 14A7 7 0 0 0 11 4z" stroke="currentColor" stroke-width="1.6"/><path d="M11 8v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Health</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="3,15 7,9 11,12 15,6 19,10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Analysis</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+
+  <script>
+    function setFilter(el) {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+  </script>
+
+</body>
+</html>

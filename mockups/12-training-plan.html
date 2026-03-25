@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stryde — Training Plan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --accent:        #F97316;
+      --accent-light:  #FED7AA;
+      --accent-dim:    #C2410C;
+      --gray-0:        #FFFFFF;
+      --gray-50:       #F9F9F9;
+      --gray-100:      #F0F0F0;
+      --gray-200:      #E0E0E0;
+      --gray-400:      #9E9E9E;
+      --gray-600:      #5E5E5E;
+      --gray-900:      #111111;
+      --status-green:  #22C55E;
+      --status-amber:  #F59E0B;
+      --status-red:    #EF4444;
+
+      --text-xs:   11px;
+      --text-sm:   13px;
+      --text-base: 15px;
+      --text-lg:   17px;
+      --text-xl:   22px;
+      --text-2xl:  28px;
+      --text-3xl:  36px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--gray-0);
+      color: var(--gray-900);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: var(--text-base);
+      padding-bottom: 80px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .page-enter { animation: fadeUp 220ms ease-out both; }
+
+    @keyframes barFill {
+      from { width: 0; }
+      to   { width: var(--target-w); }
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      animation: barFill 700ms ease-out forwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    @media (min-width: 768px) {
+      .container { max-width: 900px; padding: 0 32px; }
+    }
+
+    .card {
+      background: var(--gray-50);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .label-xs {
+      font-size: var(--text-xs);
+      color: var(--gray-400);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .card-title {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 12px;
+    }
+
+    /* Phase timeline */
+    .phase-bar {
+      display: flex;
+      gap: 4px;
+      height: 8px;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .phase-seg {
+      border-radius: 2px;
+      height: 100%;
+    }
+
+    /* Export buttons */
+    .export-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      background: var(--gray-0);
+      border: 1.5px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-size: var(--text-sm);
+      color: var(--gray-900);
+      font-weight: 600;
+      transition: border-color 150ms ease, background 150ms ease;
+      text-align: left;
+    }
+    .export-btn:hover {
+      border-color: var(--accent);
+      background: #FFFBF7;
+    }
+    .export-btn:active {
+      transform: scale(0.98);
+    }
+    .export-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+
+    /* Revision history */
+    .revision-row {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .revision-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .revision-row:first-child { padding-top: 0; }
+
+    .revision-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    /* Generate plan button */
+    .btn-generate {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: var(--text-base);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 150ms ease, transform 100ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-generate:hover { background: var(--accent-dim); }
+    .btn-generate:active { transform: scale(0.97); }
+
+    /* Weekly mileage chart (bar) */
+    .mileage-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 60px;
+    }
+    .mb {
+      flex: 1;
+      border-radius: 3px 3px 0 0;
+      min-width: 0;
+    }
+    .mb.done  { background: var(--accent); opacity: 0.7; }
+    .mb.now   { background: var(--accent); }
+    .mb.plan  { background: var(--gray-200); }
+    .mb.peak  { background: var(--accent-dim); }
+    .mb.taper { background: var(--gray-300, #D1D5DB); }
+
+    /* Tab bar */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--gray-0);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 -1px 0 var(--gray-100);
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .tab-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 3px;
+      color: var(--gray-400); font-size: var(--text-xs);
+      cursor: pointer; padding: 6px 12px;
+    }
+    .tab-item.active { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- Back nav -->
+  <div style="padding: 52px 16px 0; max-width:480px; margin:0 auto;">
+    <button
+      style="background:none; border:none; cursor:pointer; color:var(--accent); display:flex; align-items:center; gap:4px; font-size:var(--text-sm); font-weight:600; padding:0; margin-bottom:16px;"
+      onclick="history.back()"
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L6 9l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Training
+    </button>
+  </div>
+
+  <div class="container page-enter">
+
+    <!-- ── GOAL RACE HEADER ── -->
+    <div class="card" style="background:var(--gray-900); color:var(--gray-0); border-radius:20px; padding:20px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;">Goal race</div>
+          <div style="font-size:var(--text-xl); font-weight:600; color:var(--gray-0);">KL Marathon 2025</div>
+          <div style="font-size:var(--text-sm); color:var(--gray-400); margin-top:3px;">6 July 2025 · 42.2 km · Kuala Lumpur</div>
+        </div>
+        <div style="text-align:right; flex-shrink:0; margin-left:12px;">
+          <div style="font-size:var(--text-3xl); font-weight:600; color:var(--accent); line-height:1;">108</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:2px;">days to go</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid #333; display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-0);">4:15:00</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Goal time</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-0);">6:03/km</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Target pace</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-lg); font-weight:600; color:var(--gray-0);">Wk 14/24</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-top:1px;">Build phase</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AI PLAN NARRATIVE ── -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <div style="width:20px; height:20px; border-radius:6px; background:var(--accent-light); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l1.4 3 3.1.3-2.3 2 .7 3L6 7.8 3.1 9.3l.7-3L1.5 4.3l3.1-.3z" fill="var(--accent)"/></svg>
+        </div>
+        <span class="card-title" style="margin-bottom:0;">Plan overview</span>
+        <span style="font-size:var(--text-xs); color:var(--gray-400); margin-left:auto;">v3 · 6 Mar 2025</span>
+      </div>
+
+      <p style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.65; margin-bottom:12px;">
+        This 24-week plan follows a polarised training model with a 80/20 intensity split: 80% of weekly volume at easy aerobic effort (Zone 1–2) and 20% at threshold or above. Given your current aerobic base of ~55 km/week and an HRV baseline of 55ms, the plan prioritises building your long-run capacity through weeks 14–18 before transitioning into race-specific sharpening.
+      </p>
+      <p style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.65; margin-bottom:12px;">
+        Your lactate threshold pace is estimated at 5:28–5:38/km based on recent tempo efforts. The goal pace of 6:03/km represents ~90% of threshold — achievable if your long-run endurance (aerobic ceiling) continues its current trajectory. Two quality sessions per week (one tempo, one interval) are scheduled in weeks 14–19, reducing to one in the taper.
+      </p>
+      <p style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.65;">
+        Malaysia heat is factored throughout: all long runs and quality sessions are scheduled for 5:30–7:00am. Pace targets include a +5–8s/km heat allowance for weekend runs in Penang. Body battery &gt;70 is required for quality sessions — if it dips below this, the session downgrades to easy automatically.
+      </p>
+    </div>
+
+    <!-- ── PERIODISATION TIMELINE ── -->
+    <div class="card">
+      <div class="card-title">Periodisation</div>
+
+      <!-- Phase bar -->
+      <div class="phase-bar">
+        <div class="phase-seg" style="width:25%; background:#A5D6A7;" title="Base"></div>
+        <div class="phase-seg" style="width:42%; background:var(--accent);" title="Build"></div>
+        <div class="phase-seg" style="width:16%; background:#EF5350;" title="Peak"></div>
+        <div class="phase-seg" style="width:17%; background:#90CAF9;" title="Taper"></div>
+      </div>
+      <!-- Phase labels -->
+      <div style="display:flex; font-size:9px; color:var(--gray-400); gap:0; margin-bottom:16px;">
+        <div style="width:25%; text-align:center;">Base</div>
+        <div style="width:42%; text-align:center; color:var(--accent); font-weight:600;">▼ Build (now)</div>
+        <div style="width:16%; text-align:center;">Peak</div>
+        <div style="width:17%; text-align:center;">Taper</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div style="padding:10px 12px; background:var(--gray-100); border-radius:10px;">
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em;">Base · Wk 1–6</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">Completed. Aerobic development, built from 40→55 km/week. Zero intensity above Z2.</div>
+        </div>
+        <div style="padding:10px 12px; background:var(--accent-light); border-radius:10px; border:1px solid var(--accent-light);">
+          <div style="font-size:var(--text-xs); color:var(--accent); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Build · Wk 7–18 ← now</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">2× quality per week. Long runs climbing to 30–32km. Peak volume ~90 km/week (wk 18).</div>
+        </div>
+        <div style="padding:10px 12px; background:var(--gray-100); border-radius:10px;">
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em;">Peak · Wk 19–21</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">Race-pace work. Marathon-pace long runs. 1 race simulation. Highest intensity block.</div>
+        </div>
+        <div style="padding:10px 12px; background:var(--gray-100); border-radius:10px;">
+          <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em;">Taper · Wk 22–24</div>
+          <div style="font-size:var(--text-xs); color:var(--gray-600); line-height:1.5;">Volume drops 40%. Intensity maintained. Arrive at start line with CTL high, TSB +5 to +15.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── WEEKLY MILEAGE PROJECTION ── -->
+    <div class="card">
+      <div class="card-title">Weekly volume projection</div>
+      <div class="mileage-bars">
+        <!-- Weeks 1–6 done (base) -->
+        <div class="mb done" style="height:44%;"></div>
+        <div class="mb done" style="height:50%;"></div>
+        <div class="mb done" style="height:54%;"></div>
+        <div class="mb done" style="height:56%;"></div>
+        <div class="mb done" style="height:52%;"></div>
+        <div class="mb done" style="height:58%;"></div>
+        <!-- Weeks 7–13 done (build early) -->
+        <div class="mb done" style="height:62%;"></div>
+        <div class="mb done" style="height:68%;"></div>
+        <div class="mb done" style="height:72%;"></div>
+        <div class="mb done" style="height:65%;"></div>
+        <div class="mb done" style="height:74%;"></div>
+        <div class="mb done" style="height:78%;"></div>
+        <div class="mb done" style="height:76%;"></div>
+        <!-- Wk 14 current -->
+        <div class="mb now" style="height:82%;"></div>
+        <!-- Weeks 15–18 (planned) -->
+        <div class="mb plan" style="height:86%;"></div>
+        <div class="mb plan" style="height:88%;"></div>
+        <div class="mb plan" style="height:92%;"></div>
+        <div class="mb peak" style="height:100%;"></div>
+        <!-- Peak wk 19–21 -->
+        <div class="mb peak" style="height:88%;"></div>
+        <div class="mb peak" style="height:90%;"></div>
+        <div class="mb peak" style="height:84%;"></div>
+        <!-- Taper wk 22–24 -->
+        <div class="mb taper" style="height:60%;"></div>
+        <div class="mb taper" style="height:40%;"></div>
+        <div class="mb taper" style="height:25%;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px;">
+        <span style="font-size:9px; color:var(--gray-400);">Wk 1</span>
+        <span style="font-size:9px; color:var(--accent); font-weight:600;">↑ Now</span>
+        <span style="font-size:9px; color:var(--gray-400);">Wk 24 (Race)</span>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:4px;">
+          <div style="width:10px; height:10px; border-radius:2px; background:var(--accent); opacity:0.7;"></div>
+          <span style="font-size:9px; color:var(--gray-400);">Completed</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <div style="width:10px; height:10px; border-radius:2px; background:var(--gray-200);"></div>
+          <span style="font-size:9px; color:var(--gray-400);">Planned</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <div style="width:10px; height:10px; border-radius:2px; background:var(--accent-dim);"></div>
+          <span style="font-size:9px; color:var(--gray-400);">Peak</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <div style="width:10px; height:10px; border-radius:2px; background:#D1D5DB;"></div>
+          <span style="font-size:9px; color:var(--gray-400);">Taper</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EXPORT ── -->
+    <div class="card">
+      <div class="card-title">Export plan</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+
+        <!-- Google Calendar -->
+        <button class="export-btn" onclick="handleExport(this, 'gcal')">
+          <div class="export-icon" style="background:#E8F0FE;">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="3" width="14" height="13" rx="2" stroke="#4285F4" stroke-width="1.5"/>
+              <line x1="2" y1="7" x2="16" y2="7" stroke="#4285F4" stroke-width="1.5"/>
+              <line x1="6" y1="3" x2="6" y2="1" stroke="#4285F4" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="12" y1="3" x2="12" y2="1" stroke="#4285F4" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size:var(--text-sm);">Sync to Google Calendar</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); font-weight:400; margin-top:1px;">All workouts as colour-coded events</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-left:auto; color:var(--gray-400); flex-shrink:0;"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+        <!-- Garmin -->
+        <button class="export-btn" onclick="handleExport(this, 'garmin')">
+          <div class="export-icon" style="background:var(--gray-100);">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M14 9H8v3h4a5 5 0 1 1-3-8.2A5 5 0 0 1 13 5l1.5-1.5A7 7 0 1 0 15 10H14V9z" fill="var(--gray-900)"/>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size:var(--text-sm);">Push to Garmin device</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); font-weight:400; margin-top:1px;">Structured workouts with step-by-step guidance</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-left:auto; color:var(--gray-400); flex-shrink:0;"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+        <!-- ICS download -->
+        <button class="export-btn" onclick="handleExport(this, 'ics')">
+          <div class="export-icon" style="background:#F0FDF4;">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 3v8m0 0l-3-3m3 3l3-3" stroke="var(--status-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 13h12" stroke="var(--status-green)" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size:var(--text-sm);">Download .ics file</div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); font-weight:400; margin-top:1px;">Import into any calendar app</div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-left:auto; color:var(--gray-400); flex-shrink:0;"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- ── REVISION HISTORY ── -->
+    <div class="card">
+      <div class="card-title">Revision history</div>
+      <div style="display:flex; flex-direction:column;">
+
+        <div class="revision-row">
+          <div class="revision-dot" style="background:var(--accent);"></div>
+          <div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:3px;">Thu 20 Mar 2025 · v3 (current)</div>
+            <div style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">Saturday long run moved to Sunday. Easy run added Saturday. HRV suppression trend and back-to-back quality sessions flagged recovery risk.</div>
+          </div>
+        </div>
+
+        <div class="revision-row">
+          <div class="revision-dot" style="background:var(--gray-300, #D1D5DB);"></div>
+          <div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:3px;">Mon 10 Mar 2025 · v2</div>
+            <div style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">Interval session intensity reduced. Week 12 tempo skipped due to illness signal (elevated resting HR +8 bpm for 3 consecutive days). Recovery week inserted.</div>
+          </div>
+        </div>
+
+        <div class="revision-row">
+          <div class="revision-dot" style="background:var(--gray-200);"></div>
+          <div>
+            <div style="font-size:var(--text-xs); color:var(--gray-400); margin-bottom:3px;">Fri 14 Feb 2025 · v1 (initial)</div>
+            <div style="font-size:var(--text-sm); color:var(--gray-600); line-height:1.5;">Initial 24-week plan generated. Based on 847 activities (90-day backfill), 30-day HRV baseline, and KL Marathon 2025 goal of 4:15:00.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── REGENERATE ── -->
+    <div style="margin-bottom: 8px;">
+      <button class="btn-generate" onclick="handleRegenerate(this)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M3 9a6 6 0 0 1 10.4-4M15 9a6 6 0 0 1-10.4 4" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M13 5l.4 4-4-.4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 13l-.4-4 4 .4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Regenerate plan
+      </button>
+      <p style="font-size:var(--text-xs); color:var(--gray-400); text-align:center; margin-top:8px;">
+        Uses today's health data + training history · ~2 seconds · 1 Flash request
+      </p>
+    </div>
+
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="12" y="3" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="3" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/><rect x="12" y="12" width="7" height="7" rx="2" fill="currentColor" opacity="0.3"/></svg>
+      <span>Overview</span>
+    </div>
+    <div class="tab-item active">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 17V9l7-5 7 5v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="8" y="13" width="6" height="4" rx="1" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Training</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4a7 7 0 1 0 0 14A7 7 0 0 0 11 4z" stroke="currentColor" stroke-width="1.6"/><path d="M11 8v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Health</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="3,15 7,9 11,12 15,6 19,10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Analysis</span>
+    </div>
+    <div class="tab-item">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Settings</span>
+    </div>
+  </nav>
+
+  <script>
+    function handleExport(btn, type) {
+      const labels = {
+        gcal: '✓ Synced to Google Calendar',
+        garmin: '✓ Pushed to Garmin device',
+        ics: '✓ Downloading KL-Marathon-Plan.ics…',
+      };
+      const orig = btn.innerHTML;
+      btn.style.borderColor = 'var(--status-green)';
+      btn.style.background = '#F0FDF4';
+      const textNode = btn.querySelector('div div');
+      if (textNode) textNode.textContent = labels[type];
+      setTimeout(() => {
+        btn.style.borderColor = '';
+        btn.style.background = '';
+        if (textNode) textNode.textContent = btn.querySelector('div div').textContent;
+      }, 2000);
+    }
+
+    function handleRegenerate(btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="animation:spin 1s linear infinite;"><path d="M3 9a6 6 0 0 1 10.4-4M15 9a6 6 0 0 1-10.4 4" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg> Generating…`;
+
+      // Add spin keyframe
+      if (!document.querySelector('#spin-style')) {
+        const s = document.createElement('style');
+        s.id = 'spin-style';
+        s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(s);
+      }
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.background = 'var(--status-green)';
+        btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l4 4 8-8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Plan regenerated — v4`;
+        setTimeout(() => {
+          btn.style.background = '';
+          btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9a6 6 0 0 1 10.4-4M15 9a6 6 0 0 1-10.4 4" stroke="white" stroke-width="1.6" stroke-linecap="round"/><path d="M13 5l.4 4-4-.4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13l-.4-4 4 .4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Regenerate plan`;
+        }, 2500);
+      }, 2200);
+    }
+  </script>
+
+</body>
+</html>
