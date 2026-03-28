@@ -4,7 +4,8 @@
       "Bash(.venv/Scripts/python -c \":*)",
       "Bash(.venv/Scripts/python -c \"import main; print\\(''OK''\\)\")",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(ls frontend/node_modules/.bin/next*)"
     ]
   }
 }
