@@ -211,6 +211,9 @@ IDEA.md
 # Node / Next.js
 node_modules/
 .next/
+
+# Override: frontend/src/lib is Next.js source, not a Python build artifact
+!frontend/src/lib/
 out/
 .vercel/
 *.tsbuildinfo
