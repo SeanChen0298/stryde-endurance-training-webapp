@@ -32,6 +32,14 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Phase 2: daily readiness brief at 06:05 MYT
+    _scheduler.add_job(
+        _daily_readiness_brief,
+        CronTrigger(hour=6, minute=5),
+        id="daily_readiness_brief",
+        replace_existing=True,
+    )
+
     _scheduler.start()
     logger.info("APScheduler started")
 
@@ -43,25 +51,47 @@ def stop_scheduler():
         logger.info("APScheduler stopped")
 
 
-async def _daily_garmin_sync():
-    """Sync Garmin health data for all athletes who have a connected Garmin account."""
-    from config import settings
-
-    if not settings.GARMIN_CLIENT_ID:
-        logger.debug("Garmin daily sync skipped — credentials not configured")
-        return
+async def _daily_readiness_brief():
+    """Generate daily AI brief for all athletes with Gemini configured."""
+    from datetime import date as date_type
 
     from database import AsyncSessionLocal
     from models.athlete import Athlete
-    from models.oauth import OAuthToken
+    from services.ai_service import generate_daily_brief
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Athlete.id).where(Athlete.gemini_api_key_encrypted.is_not(None))
+        )
+        athlete_ids = [row[0] for row in result.fetchall()]
+
+    import redis.asyncio as aioredis
+    from config import settings as cfg
+
+    today = date_type.today()
+    redis = await aioredis.from_url(cfg.REDIS_URL, decode_responses=True)
+    try:
+        for athlete_id in athlete_ids:
+            async with AsyncSessionLocal() as db:
+                try:
+                    await generate_daily_brief(athlete_id, today, db, redis)
+                except Exception as exc:
+                    logger.error(f"Daily brief failed for athlete {athlete_id}: {exc}")
+    finally:
+        await redis.aclose()
+
+
+async def _daily_garmin_sync():
+    """Sync Garmin health data for all athletes with Garmin credentials stored."""
+    from database import AsyncSessionLocal
+    from models.athlete import Athlete
     from services.sync_service import trigger_garmin_backfill
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(Athlete.id)
-            .join(OAuthToken, OAuthToken.athlete_id == Athlete.id)
-            .where(OAuthToken.provider == "garmin")
+            select(Athlete.id).where(Athlete.garmin_tokens_encrypted.is_not(None))
         )
         athlete_ids = [row[0] for row in result.fetchall()]
 

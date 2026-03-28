@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     JWT_EXPIRE_HOURS: int = 24 * 7   # 7 days
 
     FRONTEND_URL: str = "http://localhost:3001"
+    # Comma-separated list of allowed CORS origins.
+    # In production set to your Vercel URL, e.g.: https://stryde.vercel.app
+    ALLOWED_ORIGINS: str = "http://localhost:3001"
 
     ATHLETE_TIMEZONE: str = "Asia/Kuala_Lumpur"
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"

@@ -15,7 +15,8 @@ from database import get_db
 from dependencies import get_current_athlete
 from models.activity import Activity
 from models.athlete import Athlete
-from models.health import HealthMetrics
+from models.health import HealthMetrics, ReadinessScore
+from utils.hrv import readiness_to_label
 from utils.pace import seconds_per_km_to_min_km, seconds_to_duration, meters_to_km
 
 router = APIRouter()
@@ -156,12 +157,33 @@ async def get_dashboard(
     )
     connected = {row[0] for row in result.fetchall()}
 
+    # ── Phase 2: today's readiness score + AI brief ───────────────────────────
+    readiness_score = None
+    readiness_label = None
+    ai_brief = None
+
+    result = await db.execute(
+        select(ReadinessScore).where(
+            ReadinessScore.athlete_id == athlete.id,
+            ReadinessScore.score_date == date.today(),
+        )
+    )
+    rs = result.scalar_one_or_none()
+    if rs:
+        readiness_score = rs.readiness_score
+        if rs.readiness_score:
+            readiness_label = readiness_to_label(rs.readiness_score)[0]
+        ai_brief = rs.ai_summary
+
     return DashboardData(
         weekly_mileage=weekly_mileage,
         recent_activities=recent_activities,
         hrv_trend=hrv_trend,
         sleep_trend=sleep_trend,
         gemini_connected=bool(athlete.gemini_api_key_encrypted),
-        garmin_connected="garmin" in connected,
+        garmin_connected=bool(athlete.garmin_tokens_encrypted),
         strava_connected="strava" in connected,
+        readiness_score=readiness_score,
+        readiness_label=readiness_label,
+        ai_brief=ai_brief,
     )

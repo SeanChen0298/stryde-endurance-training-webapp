@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 import httpx
@@ -30,6 +31,22 @@ class AthleteSettingsUpdate(BaseModel):
     goal_race_type: str | None = None
     goal_race_date: str | None = None        # ISO date string
     goal_finish_time_seconds: int | None = None
+
+
+class GarminCredentialsRequest(BaseModel):
+    email: str
+    password: str
+    mfa_code: str | None = None
+
+
+class GarminTokenRequest(BaseModel):
+    token_json: str   # output of garth.dumps()
+    email: str | None = None
+
+
+class GarminStatus(BaseModel):
+    connected: bool
+    email: str | None
 
 
 class AthleteSettingsResponse(BaseModel):
@@ -121,6 +138,101 @@ async def _test_gemini_key(api_key: str, model: str) -> tuple[bool, str | None]:
         return False, str(e)
 
 
+# ── Garmin Connect credentials ────────────────────────────────────────────────
+
+@router.get("/garmin", response_model=GarminStatus)
+async def get_garmin_status(
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+):
+    return GarminStatus(
+        connected=bool(athlete.garmin_tokens_encrypted),
+        email=athlete.garmin_email if athlete.garmin_tokens_encrypted else None,
+    )
+
+
+@router.post("/garmin")
+async def connect_garmin(
+    request: GarminCredentialsRequest,
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Log in to Garmin Connect, store encrypted tokens, trigger backfill."""
+    from services.garmin_client import garmin_login
+    from utils.encryption import encrypt_api_key
+
+    try:
+        tokens_json = await garmin_login(request.email, request.password, request.mfa_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        if "RATE_LIMITED" in str(exc):
+            raise HTTPException(
+                status_code=429,
+                detail="Garmin is rate-limiting login attempts. Wait 5–10 minutes and try again.",
+            )
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    athlete.garmin_email = request.email
+    athlete.garmin_tokens_encrypted = encrypt_api_key(tokens_json)
+    await db.commit()
+
+    # Trigger async backfill — keep reference to prevent GC
+    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+
+    return {"status": "connected", "email": request.email}
+
+
+@router.post("/garmin/token")
+async def connect_garmin_token(
+    request: GarminTokenRequest,
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Store pre-generated garth token JSON directly (bypasses SSO rate limits)."""
+    from utils.encryption import encrypt_api_key
+    import base64
+
+    # Basic validation — garth.dumps() produces base64
+    try:
+        decoded = base64.b64decode(request.token_json.strip()).decode()
+        if decoded == "[null, null]":
+            raise ValueError("Token is empty — re-run garth.dumps() after a successful login")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid token format: {exc}")
+
+    athlete.garmin_email = request.email or athlete.garmin_email
+    athlete.garmin_tokens_encrypted = encrypt_api_key(request.token_json.strip())
+    await db.commit()
+
+    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+
+    return {"status": "connected", "email": athlete.garmin_email}
+
+
+@router.delete("/garmin")
+async def disconnect_garmin(
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    athlete.garmin_email = None
+    athlete.garmin_tokens_encrypted = None
+    await db.commit()
+    return {"status": "disconnected"}
+
+
+async def _run_garmin_backfill(athlete_id: str):
+    from database import AsyncSessionLocal
+    from services.sync_service import trigger_garmin_backfill
+    async with AsyncSessionLocal() as db:
+        try:
+            await trigger_garmin_backfill(athlete_id)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(f"Garmin backfill error: {exc}")
+
+
 # ── Athlete profile settings ──────────────────────────────────────────────────
 
 @router.get("/profile", response_model=AthleteSettingsResponse)
@@ -146,7 +258,7 @@ async def get_profile(
         gemini_connected=bool(athlete.gemini_api_key_encrypted),
         gemini_model=athlete.gemini_model,
         strava_connected="strava" in connected,
-        garmin_connected="garmin" in connected,
+        garmin_connected=bool(athlete.garmin_tokens_encrypted),
     )
 
 

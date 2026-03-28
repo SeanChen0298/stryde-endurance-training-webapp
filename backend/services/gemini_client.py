@@ -1,5 +1,5 @@
 """
-Gemini API client wrapper.
+Gemini API client wrapper using the google-genai SDK.
 
 The athlete's API key is decrypted at call time — never stored globally.
 Calls are wrapped in run_in_executor to avoid blocking the event loop.
@@ -18,26 +18,19 @@ def _call_gemini_sync(
     temperature: float,
     max_tokens: int,
 ) -> str:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        model_name,
-        generation_config=genai.types.GenerationConfig(
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
         ),
     )
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as exc:
-        err = str(exc).lower()
-        if any(w in err for w in ("api_key", "invalid", "unauthorized", "unauthenticated")):
-            raise ValueError(f"Gemini auth failed: {exc}") from exc
-        if any(w in err for w in ("quota", "rate", "429", "resource_exhausted")):
-            raise RuntimeError(f"Gemini rate/quota limit: {exc}") from exc
-        raise
+    return response.text
 
 
 async def call_gemini(
@@ -54,8 +47,17 @@ async def call_gemini(
     from config import settings
 
     model_name = model or settings.GEMINI_PRIMARY_MODEL
+
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None,
-        functools.partial(_call_gemini_sync, prompt, api_key, model_name, temperature, max_tokens),
-    )
+    try:
+        return await loop.run_in_executor(
+            None,
+            functools.partial(_call_gemini_sync, prompt, api_key, model_name, temperature, max_tokens),
+        )
+    except Exception as exc:
+        err = str(exc).lower()
+        if any(w in err for w in ("api_key", "invalid", "unauthorized", "unauthenticated", "api key")):
+            raise ValueError(f"Gemini auth failed: {exc}") from exc
+        if any(w in err for w in ("quota", "rate", "429", "resource_exhausted")):
+            raise RuntimeError(f"Gemini rate/quota limit: {exc}") from exc
+        raise

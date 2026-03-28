@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Eye, EyeOff, CheckCircle, Loader2, Trash2 } from "lucide-react"
+import { Eye, EyeOff, CheckCircle, Loader2, Trash2, AlertCircle } from "lucide-react"
 import { api, APIError } from "@/lib/api"
 import { applyTheme, THEMES, type ThemeKey } from "@/lib/theme"
 import { PageWrapper } from "@/components/PageWrapper"
@@ -247,13 +247,11 @@ export default function SettingsPage() {
               connected={profile?.strava_connected ?? false}
               connectHref="/auth/strava"
             />
-            <ServiceRow
-              name="Garmin Connect"
-              description="HRV, sleep, body battery"
-              connected={profile?.garmin_connected ?? false}
-              connectHref="/auth/garmin"
-              pending={!profile?.garmin_connected}
-            />
+          </Section>
+
+          {/* Garmin Connect */}
+          <Section title="Garmin Connect">
+            <GarminSection />
           </Section>
 
           {/* Appearance */}
@@ -294,6 +292,220 @@ export default function SettingsPage() {
         </div>
       </PageWrapper>
     </>
+  )
+}
+
+function GarminSection() {
+  const queryClient = useQueryClient()
+  const { data: garmin, isLoading } = useQuery({
+    queryKey: ["settings", "garmin"],
+    queryFn: api.settings.getGarminStatus,
+  })
+
+  const [mode, setMode] = useState<"credentials" | "token">("credentials")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [mfaCode, setMfaCode] = useState("")
+  const [showPw, setShowPw] = useState(false)
+  const [needsMfa, setNeedsMfa] = useState(false)
+  const [tokenJson, setTokenJson] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  const connectMutation = useMutation({
+    mutationFn: () =>
+      api.settings.connectGarmin({ email, password, mfa_code: mfaCode || undefined }),
+    onSuccess: () => {
+      setEmail(""); setPassword(""); setMfaCode(""); setNeedsMfa(false); setError(null)
+      queryClient.invalidateQueries({ queryKey: ["settings", "garmin"] })
+      queryClient.invalidateQueries({ queryKey: ["settings", "profile"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    },
+    onError: (err) => {
+      if (err instanceof APIError) {
+        if (err.message.toLowerCase().includes("mfa") || err.message.toLowerCase().includes("two-factor")) {
+          setNeedsMfa(true)
+          setError("Enter the 6-digit code from your authenticator app")
+        } else {
+          setError(err.message)
+        }
+      }
+    },
+  })
+
+  const pasteTokenMutation = useMutation({
+    mutationFn: () => api.settings.connectGarminToken({ token_json: tokenJson, email }),
+    onSuccess: () => {
+      setTokenJson(""); setEmail(""); setError(null)
+      queryClient.invalidateQueries({ queryKey: ["settings", "garmin"] })
+      queryClient.invalidateQueries({ queryKey: ["settings", "profile"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    },
+    onError: (err) => {
+      if (err instanceof APIError) setError(err.message)
+    },
+  })
+
+  const disconnectMutation = useMutation({
+    mutationFn: api.settings.disconnectGarmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings", "garmin"] })
+      queryClient.invalidateQueries({ queryKey: ["settings", "profile"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    },
+  })
+
+  if (isLoading) return <div className="skeleton" style={{ height: 40 }} />
+
+  if (garmin?.connected) {
+    return (
+      <div>
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
+            padding: "10px 14px", background: "#F0FDF4", borderRadius: 10, border: "1px solid #BBF7D0",
+          }}
+        >
+          <CheckCircle size={16} color="var(--status-green)" />
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "#15803D", fontWeight: 600 }}>
+              Connected
+            </span>
+            {garmin.email && (
+              <span style={{ fontSize: "var(--text-xs)", color: "#15803D", marginLeft: 8 }}>
+                {garmin.email}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="body-text" style={{ marginBottom: 16 }}>
+          Health data (HRV, sleep, body battery) syncs daily at 06:00 MYT.
+        </p>
+        <button
+          className="btn-secondary"
+          style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--status-red)" }}
+          onClick={() => disconnectMutation.mutate()}
+          disabled={disconnectMutation.isPending}
+        >
+          <Trash2 size={14} /> Disconnect Garmin
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {/* Mode toggle */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "var(--gray-100)", borderRadius: 10, padding: 3 }}>
+        {(["credentials", "token"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => { setMode(m); setError(null) }}
+            style={{
+              flex: 1, padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: "var(--text-xs)", fontWeight: 600,
+              background: mode === m ? "var(--gray-0)" : "transparent",
+              color: mode === m ? "var(--gray-900)" : "var(--gray-400)",
+              boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              transition: "all 150ms ease",
+            }}
+          >
+            {m === "credentials" ? "Email & password" : "Paste token"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "credentials" ? (
+        <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+            <div>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Email</div>
+              <input type="email" className="input" placeholder="you@example.com"
+                value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
+            </div>
+            <div>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Password</div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPw ? "text" : "password"} className="input"
+                  placeholder="Garmin Connect password" value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(null) }}
+                  style={{ paddingRight: 48 }}
+                />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", color: "var(--gray-400)", padding: 4, display: "flex" }}>
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            {needsMfa && (
+              <div>
+                <div className="metric-label" style={{ marginBottom: 6 }}>MFA Code</div>
+                <input type="text" className="input" placeholder="123456" value={mfaCode}
+                  onChange={(e) => { setMfaCode(e.target.value); setError(null) }}
+                  maxLength={6} inputMode="numeric" />
+              </div>
+            )}
+          </div>
+          {error && <ErrorBox message={error} />}
+          <button className="btn-primary" onClick={() => connectMutation.mutate()}
+            disabled={!email || !password || connectMutation.isPending}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {connectMutation.isPending
+              ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Connecting…</>
+              : "Connect Garmin"}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div
+            style={{
+              background: "var(--gray-100)", borderRadius: 10, padding: "12px 14px",
+              fontSize: "var(--text-xs)", color: "var(--gray-600)", marginBottom: 14, lineHeight: 1.7,
+            }}
+          >
+            <strong style={{ color: "var(--gray-900)" }}>Run this in any terminal on your machine:</strong>
+            <pre style={{ margin: "8px 0 0", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--gray-900)" }}>
+              {`pip install garth\npython -c "import garth; garth.login('you@email.com','yourpass'); print(garth.dumps())"`}
+            </pre>
+            Copy the output and paste below.
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div className="metric-label" style={{ marginBottom: 6 }}>Email (for display)</div>
+            <input type="email" className="input" placeholder="you@garmin.com"
+              value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div className="metric-label" style={{ marginBottom: 6 }}>Token JSON</div>
+            <textarea className="input" placeholder="Paste garth.dumps() output here…"
+              value={tokenJson} onChange={(e) => { setTokenJson(e.target.value); setError(null) }}
+              rows={4} style={{ resize: "vertical", fontFamily: "monospace", fontSize: "var(--text-xs)" }} />
+          </div>
+          {error && <ErrorBox message={error} />}
+          <button className="btn-primary" onClick={() => pasteTokenMutation.mutate()}
+            disabled={!tokenJson || pasteTokenMutation.isPending}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {pasteTokenMutation.isPending
+              ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Saving…</>
+              : "Save token"}
+          </button>
+        </div>
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 8,
+      background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8,
+      padding: "10px 12px", fontSize: "var(--text-sm)", color: "#B91C1C", marginBottom: 12,
+    }}>
+      <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+      {message}
+    </div>
   )
 }
 

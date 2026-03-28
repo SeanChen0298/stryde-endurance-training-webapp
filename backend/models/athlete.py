@@ -27,6 +27,10 @@ class Athlete(Base):
     gemini_api_key_encrypted: Mapped[str | None] = mapped_column(String)
     gemini_model: Mapped[str] = mapped_column(String, default="gemini-2.5-flash")
 
+    # Garmin Connect credentials (python-garminconnect / garth SSO)
+    garmin_email: Mapped[str | None] = mapped_column(String)
+    garmin_tokens_encrypted: Mapped[str | None] = mapped_column(String)  # garth OAuth tokens JSON, AES-256 encrypted
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

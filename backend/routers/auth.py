@@ -110,7 +110,7 @@ async def get_me(
         gemini_connected=bool(athlete.gemini_api_key_encrypted),
         gemini_model=athlete.gemini_model,
         strava_connected="strava" in connected,
-        garmin_connected="garmin" in connected,
+        garmin_connected=bool(athlete.garmin_tokens_encrypted),
     )
 
 

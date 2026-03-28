@@ -106,6 +106,35 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Phase 2: Readiness ring + AI brief */}
+          {data && data.readiness_score !== null && (
+            <div className="card-grid" style={{ marginBottom: 0 }}>
+              <div className="card card-half" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <ReadinessRing score={data.readiness_score ?? 0} />
+                <div style={{ textAlign: "center" }}>
+                  <div className="metric-label">Readiness</div>
+                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--gray-900)", marginTop: 2 }}>
+                    {data.readiness_label ?? "—"}
+                  </div>
+                </div>
+              </div>
+              <div className="card card-half">
+                <div className="metric-label" style={{ marginBottom: 6 }}>AI Brief</div>
+                {data.ai_brief ? (
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--gray-600)", lineHeight: 1.6 }}>
+                    {data.ai_brief.split("\n").filter(Boolean).map((line, i) => (
+                      <div key={i} style={{ marginBottom: 4 }}>{line}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--gray-400)" }}>
+                    Brief generates at 06:05 MYT after your Garmin syncs.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="card-grid">
             {/* Weekly mileage */}
             <div className="card card-full">
@@ -152,17 +181,17 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* AI brief gate */}
-            <div className="card-full">
-              <AIFeatureGate>
-                <div className="card">
-                  <div className="card-title" style={{ marginBottom: 8 }}>AI Daily Brief</div>
-                  <div className="body-text">
-                    {data?.ai_brief ?? "Brief will appear after your next sync."}
+            {/* AI brief (Phase 2 — shown when no readiness ring already displayed above) */}
+            {(!data || data.readiness_score === null) && (
+              <div className="card-full">
+                <AIFeatureGate>
+                  <div className="card">
+                    <div className="card-title" style={{ marginBottom: 8 }}>AI Daily Brief</div>
+                    <div className="body-text">Brief will appear after your Garmin syncs.</div>
                   </div>
-                </div>
-              </AIFeatureGate>
-            </div>
+                </AIFeatureGate>
+              </div>
+            )}
 
             {/* Recent activities */}
             <div className="card card-full">
@@ -246,6 +275,29 @@ export default function DashboardPage() {
         </div>
       </PageWrapper>
     </>
+  )
+}
+
+function ReadinessRing({ score }: { score: number }) {
+  const r = 36
+  const circ = 2 * Math.PI * r
+  const filled = (score / 100) * circ
+  const color = score >= 70 ? "var(--status-green)" : score >= 50 ? "var(--status-amber)" : "var(--status-red)"
+  return (
+    <svg width={88} height={88} viewBox="0 0 88 88">
+      <circle cx={44} cy={44} r={r} fill="none" stroke="var(--gray-200)" strokeWidth={8} />
+      <circle
+        cx={44} cy={44} r={r} fill="none"
+        stroke={color} strokeWidth={8}
+        strokeDasharray={`${filled} ${circ}`}
+        strokeLinecap="round"
+        transform="rotate(-90 44 44)"
+        style={{ transition: "stroke-dasharray 700ms ease" }}
+      />
+      <text x={44} y={48} textAnchor="middle" fontSize={18} fontWeight={600} fill="var(--gray-900)">
+        {Math.round(score)}
+      </text>
+    </svg>
   )
 }
 

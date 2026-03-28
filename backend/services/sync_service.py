@@ -115,56 +115,73 @@ def normalise_garmin_activity(raw: dict, athlete_id: str) -> dict:
     }
 
 
-def normalise_garmin_health(raw_daily: dict, raw_sleep: dict | None, raw_hrv: dict | None, athlete_id: str) -> dict:
+def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) -> dict:
     """
-    Map Garmin wellness + sleep + HRV data to health_metrics schema.
+    Map python-garminconnect health data to health_metrics schema.
+    raw = {stats, sleep, hrv, rhr} from garmin_client.fetch_health_day()
+    # Uses internal schema only — not Garmin API data (passed to AI layer)
     """
-    cal_date = raw_daily.get("calendarDate")
-    recorded_date = datetime.strptime(cal_date, "%Y-%m-%d").date() if cal_date else None
+    stats = raw.get("stats") or {}
+    sleep_raw = raw.get("sleep") or {}
+    hrv_raw = raw.get("hrv") or {}
+    rhr_raw = raw.get("rhr") or {}
 
-    sleep_duration = None
-    deep_sleep = None
-    rem_sleep = None
+    # Sleep — nested under dailySleepDTO
+    sleep_dto = sleep_raw.get("dailySleepDTO") or {}
+    sleep_duration = (sleep_dto.get("sleepTimeSeconds") or 0) // 60 or None
+    deep_sleep = (sleep_dto.get("deepSleepSeconds") or 0) // 60 or None
+    rem_sleep = (sleep_dto.get("remSleepSeconds") or 0) // 60 or None
     sleep_start = None
     sleep_end = None
+    if sleep_dto.get("sleepStartTimestampGMT"):
+        sleep_start = datetime.fromtimestamp(sleep_dto["sleepStartTimestampGMT"] / 1000, tz=timezone.utc)
+    if sleep_dto.get("sleepEndTimestampGMT"):
+        sleep_end = datetime.fromtimestamp(sleep_dto["sleepEndTimestampGMT"] / 1000, tz=timezone.utc)
     sleep_score = None
+    scores = sleep_raw.get("sleepScores") or {}
+    if isinstance(scores, dict):
+        sleep_score = scores.get("overall") or scores.get("totalScore")
+    elif isinstance(scores, list) and scores:
+        sleep_score = scores[0].get("value")
 
-    if raw_sleep:
-        sleep_duration = raw_sleep.get("sleepTimeSeconds", 0) // 60
-        deep_sleep = raw_sleep.get("deepSleepDurationInSeconds", 0) // 60
-        rem_sleep = raw_sleep.get("remSleepInSeconds", 0) // 60
-        sleep_score = raw_sleep.get("sleepScores", {}).get("overall", {}).get("value")
+    # HRV — nested under hrvSummary
+    hrv_summary = hrv_raw.get("hrvSummary") or {}
+    hrv_rmssd = hrv_summary.get("lastNight") or hrv_summary.get("rmssd")
+    hrv_sdrr = hrv_summary.get("sdrr")
 
-        if raw_sleep.get("startTimeInSeconds"):
-            sleep_start = datetime.fromtimestamp(raw_sleep["startTimeInSeconds"], tz=timezone.utc)
-        if raw_sleep.get("endTimeInSeconds"):
-            sleep_end = datetime.fromtimestamp(raw_sleep["endTimeInSeconds"], tz=timezone.utc)
+    # Resting HR
+    resting_hr = (
+        stats.get("restingHeartRate")
+        or rhr_raw.get("value")
+        or (rhr_raw.get("allMetrics", {}).get("metricsMap", {}).get("WELLNESS_RESTING_HEART_RATE") or [{}])[0].get("value")
+    )
+    if isinstance(resting_hr, float):
+        resting_hr = int(resting_hr)
 
-    hrv_rmssd = None
-    hrv_sdrr = None
-    if raw_hrv:
-        hrv_rmssd = raw_hrv.get("lastNight", {}).get("rmssd")
-        hrv_sdrr = raw_hrv.get("lastNight", {}).get("sdrr")
+    # Body battery
+    bb = stats.get("bodyBattery") or {}
+    bb_max = bb.get("charged") if isinstance(bb, dict) else None
+    bb_min = bb.get("drained") if isinstance(bb, dict) else None
 
     return {
         "athlete_id": athlete_id,
-        "recorded_date": recorded_date,
-        "hrv_rmssd": hrv_rmssd,
-        "hrv_sdrr": hrv_sdrr,
-        "resting_hr": raw_daily.get("restingHeartRateInBeatsPerMinute"),
-        "sleep_score": sleep_score,
+        "recorded_date": for_date,
+        "hrv_rmssd": float(hrv_rmssd) if hrv_rmssd is not None else None,
+        "hrv_sdrr": float(hrv_sdrr) if hrv_sdrr is not None else None,
+        "resting_hr": resting_hr,
+        "sleep_score": int(sleep_score) if sleep_score is not None else None,
         "sleep_duration_minutes": sleep_duration,
         "deep_sleep_minutes": deep_sleep,
         "rem_sleep_minutes": rem_sleep,
         "sleep_start": sleep_start,
         "sleep_end": sleep_end,
-        "body_battery_max": raw_daily.get("bodyBatteryMostRecentValue"),
-        "body_battery_min": raw_daily.get("bodyBatteryLowestValue"),
-        "stress_avg": raw_daily.get("averageStressLevel"),
-        "steps": raw_daily.get("totalSteps"),
-        "spo2_avg": raw_daily.get("averageSpo2"),
-        "respiratory_rate": raw_daily.get("averageRespiratoryRate"),
-        "training_readiness_score": raw_daily.get("trainingReadinessScore"),
+        "body_battery_max": int(bb_max) if bb_max is not None else None,
+        "body_battery_min": int(bb_min) if bb_min is not None else None,
+        "stress_avg": stats.get("averageStressLevel"),
+        "steps": stats.get("totalSteps"),
+        "spo2_avg": stats.get("averageSpo2"),
+        "respiratory_rate": stats.get("averageRespiratoryRate"),
+        "training_readiness_score": stats.get("trainingReadinessScore"),
     }
 
 
@@ -271,38 +288,33 @@ async def trigger_strava_backfill(athlete_id: str) -> None:
 
 
 async def trigger_garmin_backfill(athlete_id: str) -> None:
-    """Backfill 90 days of Garmin health data. Silently skips if creds not configured."""
-    from config import settings
-    from services.garmin_client import get_valid_garmin_client
-
-    if not settings.GARMIN_CLIENT_ID:
-        logger.debug("Garmin backfill skipped — credentials not configured")
-        return
-
-    start = date.today() - timedelta(days=90)
-    end = date.today()
+    """Backfill 90 days of Garmin health data. Silently skips if not connected."""
+    from services.garmin_client import get_valid_garmin_tokens, fetch_health_day, save_refreshed_tokens
 
     async with AsyncSessionLocal() as db:
-        client = await get_valid_garmin_client(athlete_id, db)
-        if not client:
+        tokens_json = await get_valid_garmin_tokens(athlete_id, db)
+        if not tokens_json:
+            logger.debug(f"Garmin backfill skipped for {athlete_id} — not connected")
             return
 
-        try:
-            dailies = await client.get_daily_summaries(start, end)
-            sleeps = {s["calendarDate"]: s for s in await client.get_sleep_data(start, end)}
-            hrvs = {h.get("calendarDate", ""): h for h in await client.get_hrv_data(start, end)}
+        start = date.today() - timedelta(days=90)
+        total = 0
+        refreshed_tokens = tokens_json
 
-            for daily in dailies:
-                cal_date = daily.get("calendarDate", "")
-                data = normalise_garmin_health(
-                    daily,
-                    sleeps.get(cal_date),
-                    hrvs.get(cal_date),
-                    athlete_id,
-                )
-                if data.get("recorded_date"):
+        for i in range(90):
+            day = start + timedelta(days=i)
+            try:
+                raw = await fetch_health_day(refreshed_tokens, day)
+                refreshed_tokens = raw.get("_tokens", refreshed_tokens)
+                data = normalise_garmin_health_connect(raw, day, athlete_id)
+                if any(v is not None for k, v in data.items() if k not in ("athlete_id", "recorded_date")):
                     await upsert_health_metrics(data, db)
+                    total += 1
+            except Exception as e:
+                logger.warning(f"Garmin health fetch failed for {athlete_id} on {day}: {e}")
 
-            logger.info(f"Garmin health backfill complete for {athlete_id}: {len(dailies)} days")
-        finally:
-            await client.close()
+        # Persist any refreshed tokens
+        if refreshed_tokens != tokens_json:
+            await save_refreshed_tokens(athlete_id, refreshed_tokens, db)
+
+        logger.info(f"Garmin health backfill complete for {athlete_id}: {total} days with data")
