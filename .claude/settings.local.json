@@ -35,10 +35,14 @@
       "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8001 -State Listen | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force; Write-Host \"\"Killed $_\"\" }\")",
       "Bash(grep -r localhost /c/Repo/stryde-endurance-training/frontend/src --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
       "Bash(grep -r \"8000\\\\|8001\\\\|3000\\\\|3001\" /c/Repo/stryde-endurance-training/frontend/src --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
-      "Bash(grep -r \"localhost\\\\|8000\\\\|8001\\\\|3000\\\\|3001\" /c/Repo/stryde-endurance-training/backend --include=*.py --exclude-dir=.venv)"
+      "Bash(grep -r \"localhost\\\\|8000\\\\|8001\\\\|3000\\\\|3001\" /c/Repo/stryde-endurance-training/backend --include=*.py --exclude-dir=.venv)",
+      "Bash(.venv/Scripts/python -c \"import google.generativeai; print\\(''google-generativeai:'', google.generativeai.__version__\\)\")",
+      "Bash(.venv/Scripts/python -c \"from google import genai; print\\(''google-genai OK''\\)\")",
+      "Bash(.venv/Scripts/python -c \"from garminconnect import Garmin; print\\(''garminconnect OK''\\)\")"
     ],
     "additionalDirectories": [
-      "c:\\Repo\\stryde-endurance-training\\frontend\\src\\app\\dashboard\\activities"
+      "c:\\Repo\\stryde-endurance-training\\frontend\\src\\app\\dashboard\\activities",
+      "c:\\Repo\\stryde-endurance-training\\frontend\\src\\app\\dashboard\\health"
     ]
   }
 }
