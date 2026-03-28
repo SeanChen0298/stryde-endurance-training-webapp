@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle, Clock, AlertCircle, ArrowRight } from "lucide-react"
 import { motion } from "framer-motion"
@@ -9,6 +9,14 @@ import { api } from "@/lib/api"
 import { PageWrapper } from "@/components/PageWrapper"
 
 export default function ConnectPage() {
+  return (
+    <Suspense>
+      <ConnectPageInner />
+    </Suspense>
+  )
+}
+
+function ConnectPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const stravaParam = searchParams.get("strava")
