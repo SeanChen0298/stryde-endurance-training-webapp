@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/alembic upgrade:*)",
+      "Bash(.venv/Scripts/alembic downgrade:*)",
+      "Bash(.venv/Scripts/python -c \":*)",
+      "Bash(.venv/Scripts/python seed.py)",
+      "Bash(.venv/Scripts/python ..scriptsseed.py)",
+      "Bash(.venv/Scripts/python \"../scripts/seed.py\")",
+      "Bash(.venv/Scripts/pip show:*)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/python -c \"import main; print\\(''imports OK''\\)\")",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(npm install:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(start http://localhost:3000)",
+      "Bash(SEED_EMAIL=\"yoonsean0298@gmail.com\" SEED_NAME=\"Yoon Sean\" SEED_PASSWORD=\"Password123\" .venv/Scripts/python \"../scripts/seed.py\")",
+      "Bash(curl -s -c cookies.txt -b cookies.txt -X POST http://localhost:8000/auth/login -H \"Content-Type: application/x-www-form-urlencoded\" -d \"username=yoonsean0298@gmail.com&password=Password123\")",
+      "Bash(curl -s -b cookies.txt http://localhost:8000/dashboard)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''strava_connected:'''', d[''''strava_connected'''']\\)\")",
+      "Bash(curl -sv http://localhost:8000/auth/strava)",
+      "Bash(curl -s http://localhost:8000/auth/strava/url -H \"Authorization: Bearer test\")",
+      "Bash(curl -s http://localhost:8000/openapi.json)",
+      "Bash(.venv/Scripts/python -c \"from routers.auth import router; print\\([r.path for r in router.routes]\\)\")",
+      "Bash(taskkill /F /IM uvicorn.exe)",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq uvicorn*\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 9036 /F)",
+      "Bash(taskkill /PID 4388 /F)",
+      "Bash(cmd /c \"taskkill /PID 9036 /F & taskkill /PID 4388 /F\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue; Write-Host \"\"Killed PID $_\"\" }\")",
+      "Bash(curl -s http://localhost:8001/openapi.json)",
+      "Bash(\"C:\\\\Repo\\\\stryde-endurance-training\\\\frontend\\\\.env.local\")",
+      "Bash(curl -s http://localhost:8001/health)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8001 -State Listen | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force; Write-Host \"\"Killed $_\"\" }\")",
+      "Bash(grep -r localhost /c/Repo/stryde-endurance-training/frontend/src --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
+      "Bash(grep -r \"8000\\\\|8001\\\\|3000\\\\|3001\" /c/Repo/stryde-endurance-training/frontend/src --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
+      "Bash(grep -r \"localhost\\\\|8000\\\\|8001\\\\|3000\\\\|3001\" /c/Repo/stryde-endurance-training/backend --include=*.py --exclude-dir=.venv)"
+    ],
+    "additionalDirectories": [
+      "c:\\Repo\\stryde-endurance-training\\frontend\\src\\app\\dashboard\\activities"
+    ]
+  }
+}
