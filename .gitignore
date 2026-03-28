@@ -207,3 +207,4 @@ marimo/_lsp/
 __marimo__/
 
 IDEA.md
+frontend/node_modules/@next/swc-win32-x64-msvc/next-swc.win32-x64-msvc.node
