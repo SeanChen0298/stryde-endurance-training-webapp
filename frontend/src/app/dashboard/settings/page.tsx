@@ -325,6 +325,9 @@ function GarminSection() {
         if (err.message.toLowerCase().includes("mfa") || err.message.toLowerCase().includes("two-factor")) {
           setNeedsMfa(true)
           setError("Enter the 6-digit code from your authenticator app")
+        } else if (err.status === 429 || err.message.toLowerCase().includes("rate")) {
+          setMode("token")
+          setError("rate_limited")
         } else {
           setError(err.message)
         }
@@ -447,7 +450,7 @@ function GarminSection() {
               </div>
             )}
           </div>
-          {error && <ErrorBox message={error} />}
+          {error && error !== "rate_limited" && <ErrorBox message={error} />}
           <button className="btn-primary" onClick={() => connectMutation.mutate()}
             disabled={!email || !password || connectMutation.isPending}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -458,17 +461,30 @@ function GarminSection() {
         </div>
       ) : (
         <div>
+          {error === "rate_limited" && (
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: 8,
+              background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8,
+              padding: "10px 12px", fontSize: "var(--text-sm)", color: "#92400E", marginBottom: 14,
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>
+                <strong>Garmin is rate-limiting login attempts</strong> — too many tries from the server&apos;s IP.
+                Use the token method below to connect without going through Garmin&apos;s SSO.
+              </span>
+            </div>
+          )}
           <div
             style={{
               background: "var(--gray-100)", borderRadius: 10, padding: "12px 14px",
               fontSize: "var(--text-xs)", color: "var(--gray-600)", marginBottom: 14, lineHeight: 1.7,
             }}
           >
-            <strong style={{ color: "var(--gray-900)" }}>Run this in any terminal on your machine:</strong>
+            <strong style={{ color: "var(--gray-900)" }}>Run this script on your own machine (not the server):</strong>
             <pre style={{ margin: "8px 0 0", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--gray-900)" }}>
-              {`pip install garth\npython -c "import garth; garth.login('you@email.com','yourpass'); print(garth.dumps())"`}
+              {`pip install garth\npython - <<'EOF'\nimport garth, getpass\nemail = input("Garmin email: ")\npwd = getpass.getpass("Password: ")\nclient = garth.Client()\nresult = client.login(email, pwd, return_on_mfa=True)\nif isinstance(result, tuple) and result[0] == "needs_mfa":\n    code = input("MFA code: ")\n    import garth.sso\n    garth.sso.resume_login(result[1]["client"], result[1]["signin_params"], code)\n    print(result[1]["client"].dumps())\nelse:\n    print(client.dumps())\nEOF`}
             </pre>
-            Copy the output and paste below.
+            Copy the output line and paste below.
           </div>
           <div style={{ marginBottom: 10 }}>
             <div className="metric-label" style={{ marginBottom: 6 }}>Email (for display)</div>
@@ -476,12 +492,12 @@ function GarminSection() {
               value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
           </div>
           <div style={{ marginBottom: 12 }}>
-            <div className="metric-label" style={{ marginBottom: 6 }}>Token JSON</div>
-            <textarea className="input" placeholder="Paste garth.dumps() output here…"
+            <div className="metric-label" style={{ marginBottom: 6 }}>Token (output of script above)</div>
+            <textarea className="input" placeholder="Paste the token output here…"
               value={tokenJson} onChange={(e) => { setTokenJson(e.target.value); setError(null) }}
               rows={4} style={{ resize: "vertical", fontFamily: "monospace", fontSize: "var(--text-xs)" }} />
           </div>
-          {error && <ErrorBox message={error} />}
+          {error && error !== "rate_limited" && <ErrorBox message={error} />}
           <button className="btn-primary" onClick={() => pasteTokenMutation.mutate()}
             disabled={!tokenJson || pasteTokenMutation.isPending}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>

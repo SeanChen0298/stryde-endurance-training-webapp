@@ -191,15 +191,23 @@ async def connect_garmin_token(
 ):
     """Store pre-generated garth token JSON directly (bypasses SSO rate limits)."""
     from utils.encryption import encrypt_api_key
-    import base64
+    import functools
 
-    # Basic validation — garth.dumps() produces base64
-    try:
-        decoded = base64.b64decode(request.token_json.strip()).decode()
-        if decoded == "[null, null]":
+    # Validate by actually loading the token with garth
+    def _validate(token_json: str) -> None:
+        import garth
+        client = garth.Client()
+        client.loads(token_json.strip())
+        if not client.oauth1_token and not client.oauth2_token:
             raise ValueError("Token is empty — re-run garth.dumps() after a successful login")
+
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, functools.partial(_validate, request.token_json))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid token format: {exc}")
+        raise HTTPException(status_code=400, detail=f"Invalid token — make sure you paste the full output of garth.dumps(): {exc}")
 
     athlete.garmin_email = request.email or athlete.garmin_email
     athlete.garmin_tokens_encrypted = encrypt_api_key(request.token_json.strip())
