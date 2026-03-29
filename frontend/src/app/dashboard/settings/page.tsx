@@ -412,13 +412,16 @@ function GarminSection() {
               transition: "all 150ms ease",
             }}
           >
-            {m === "credentials" ? "Email & password" : "Paste token"}
+            {m === "credentials" ? "Sign in" : "Rate-limited? Paste token"}
           </button>
         ))}
       </div>
 
       {mode === "credentials" ? (
         <div>
+          <p className="body-text" style={{ marginBottom: 14 }}>
+            The server logs in to Garmin on your behalf — works from any device, no Python needed.
+          </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
             <div>
               <div className="metric-label" style={{ marginBottom: 6 }}>Email</div>
