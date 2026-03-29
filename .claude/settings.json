@@ -5,7 +5,13 @@
       "Bash(.venv/Scripts/python -c \"import main; print\\(''OK''\\)\")",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(ls frontend/node_modules/.bin/next*)"
+      "Bash(ls frontend/node_modules/.bin/next*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(curl -s \"https://pypi.org/pypi/garth/json\")",
+      "WebFetch(domain:pypi.org)"
     ]
   }
 }

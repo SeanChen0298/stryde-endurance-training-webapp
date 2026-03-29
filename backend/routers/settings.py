@@ -223,18 +223,36 @@ async def connect_garmin_token(
 async def debug_garmin_fetch(
     athlete: Annotated[Athlete, Depends(get_current_athlete)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    date: str | None = None,
 ):
-    """Return raw garminconnect response for today — for diagnosing field mapping."""
+    """Return raw garminconnect response for a date (default today) — for diagnosing field mapping.
+    Pass ?date=YYYY-MM-DD to inspect a past date.
+    """
     from services.garmin_client import get_valid_garmin_tokens, fetch_health_day
     import datetime
 
     tokens_json = await get_valid_garmin_tokens(athlete.id, db)
     if not tokens_json:
         raise HTTPException(status_code=400, detail="Garmin not connected")
-    today = datetime.date.today()
-    raw = await fetch_health_day(tokens_json, today)
+
+    if date:
+        try:
+            target_date = datetime.date.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD")
+    else:
+        target_date = datetime.date.today()
+
+    raw = await fetch_health_day(tokens_json, target_date)
     raw.pop("_tokens", None)  # don't leak tokens in response
-    return raw
+
+    # Also show what the normaliser would produce
+    from services.sync_service import normalise_garmin_health_connect
+    normalised = normalise_garmin_health_connect(raw, target_date, str(athlete.id))
+    normalised.pop("athlete_id", None)
+    normalised.pop("raw_metadata", None) if "raw_metadata" in normalised else None
+
+    return {"raw": raw, "normalised": normalised}
 
 
 @router.post("/garmin/sync")

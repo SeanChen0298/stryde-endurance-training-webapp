@@ -136,6 +136,10 @@ async def generate_plan(
 ):
     if not athlete.gemini_api_key_encrypted:
         raise HTTPException(status_code=400, detail="Configure your Gemini API key in Settings first")
+    if not athlete.goal_race_type:
+        raise HTTPException(status_code=400, detail="Set a goal race type in Settings before generating a plan")
+    if not athlete.goal_race_date:
+        raise HTTPException(status_code=400, detail="Set a goal race date in Settings before generating a plan")
     task = asyncio.create_task(_run_plan_generation(athlete.id))
     task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
     return {"status": "generating", "message": "Plan generation started — check back in ~30 seconds"}

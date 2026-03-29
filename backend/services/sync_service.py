@@ -296,7 +296,7 @@ async def trigger_garmin_backfill(athlete_id: str) -> None:
         total = 0
         refreshed_tokens = tokens_json
 
-        for i in range(90):
+        for i in range(91):  # 0..90 inclusive so today is covered
             day = start + timedelta(days=i)
             try:
                 raw = await fetch_health_day(refreshed_tokens, day)
