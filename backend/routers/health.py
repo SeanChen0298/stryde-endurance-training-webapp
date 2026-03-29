@@ -38,11 +38,16 @@ class HealthDayDetail(BaseModel):
     hrv_rmssd: float | None
     resting_hr: int | None
     sleep_score: int | None
+    sleep_score_insight: str | None
     sleep_duration_minutes: int | None
     deep_sleep_minutes: int | None
+    light_sleep_minutes: int | None
     rem_sleep_minutes: int | None
+    awake_count: int | None
+    sleep_stress_avg: float | None
     body_battery_max: int | None
     body_battery_min: int | None
+    body_battery_at_wake: int | None
     stress_avg: int | None
     steps: int | None
     spo2_avg: float | None
@@ -137,11 +142,16 @@ async def _get_day_detail(athlete_id: str, day: date, db: AsyncSession) -> Healt
         hrv_rmssd=hm.hrv_rmssd if hm else None,
         resting_hr=hm.resting_hr if hm else None,
         sleep_score=hm.sleep_score if hm else None,
+        sleep_score_insight=hm.sleep_score_insight if hm else None,
         sleep_duration_minutes=hm.sleep_duration_minutes if hm else None,
         deep_sleep_minutes=hm.deep_sleep_minutes if hm else None,
+        light_sleep_minutes=hm.light_sleep_minutes if hm else None,
         rem_sleep_minutes=hm.rem_sleep_minutes if hm else None,
+        awake_count=hm.awake_count if hm else None,
+        sleep_stress_avg=hm.sleep_stress_avg if hm else None,
         body_battery_max=hm.body_battery_max if hm else None,
         body_battery_min=hm.body_battery_min if hm else None,
+        body_battery_at_wake=hm.body_battery_at_wake if hm else None,
         stress_avg=hm.stress_avg if hm else None,
         steps=hm.steps if hm else None,
         spo2_avg=hm.spo2_avg if hm else None,

@@ -22,6 +22,12 @@ class HealthMetrics(Base):
     sleep_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sleep_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    light_sleep_minutes: Mapped[int | None] = mapped_column(Integer)
+    awake_count: Mapped[int | None] = mapped_column(Integer)               # wake-ups during sleep
+    sleep_stress_avg: Mapped[float | None] = mapped_column(Float)          # avg stress during sleep
+    body_battery_at_wake: Mapped[int | None] = mapped_column(Integer)      # BB level at wake time
+    sleep_score_insight: Mapped[str | None] = mapped_column(Text)          # e.g. NEGATIVE_LATE_BED_TIME
+
     body_battery_max: Mapped[int | None] = mapped_column(Integer)
     body_battery_min: Mapped[int | None] = mapped_column(Integer)
     stress_avg: Mapped[int | None] = mapped_column(Integer)

@@ -245,6 +245,7 @@ async def debug_garmin_fetch(
 
     raw = await fetch_health_day(tokens_json, target_date)
     raw.pop("_tokens", None)  # don't leak tokens in response
+    hrv_error = raw.pop("_hrv_error", None)
 
     # Also show what the normaliser would produce
     from services.sync_service import normalise_garmin_health_connect
@@ -252,7 +253,11 @@ async def debug_garmin_fetch(
     normalised.pop("athlete_id", None)
     normalised.pop("raw_metadata", None) if "raw_metadata" in normalised else None
 
-    return {"raw": raw, "normalised": normalised}
+    return {
+        "raw": raw,
+        "normalised": normalised,
+        **({"hrv_fetch_error": hrv_error} if hrv_error else {}),
+    }
 
 
 @router.post("/garmin/sync")

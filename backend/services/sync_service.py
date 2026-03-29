@@ -130,7 +130,11 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
     sleep_dto = sleep_raw.get("dailySleepDTO") or {}
     sleep_duration = (sleep_dto.get("sleepTimeSeconds") or 0) // 60 or None
     deep_sleep = (sleep_dto.get("deepSleepSeconds") or 0) // 60 or None
+    light_sleep = (sleep_dto.get("lightSleepSeconds") or 0) // 60 or None
     rem_sleep = (sleep_dto.get("remSleepSeconds") or 0) // 60 or None
+    awake_count = sleep_dto.get("awakeCount")
+    sleep_stress_avg = sleep_dto.get("avgSleepStress")
+    sleep_score_insight = sleep_dto.get("sleepScoreInsight")  # e.g. "NEGATIVE_LATE_BED_TIME"
     sleep_start = None
     sleep_end = None
     if sleep_dto.get("sleepStartTimestampGMT"):
@@ -157,6 +161,7 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
     # Body battery — flat fields in stats (not a nested dict)
     bb_max = stats.get("bodyBatteryChargedValue") or stats.get("bodyBatteryHighestValue")
     bb_min = stats.get("bodyBatteryDrainedValue") or stats.get("bodyBatteryLowestValue")
+    bb_at_wake = stats.get("bodyBatteryAtWakeTime")
 
     return {
         "athlete_id": athlete_id,
@@ -167,11 +172,16 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
         "sleep_score": int(sleep_score) if sleep_score is not None else None,
         "sleep_duration_minutes": sleep_duration,
         "deep_sleep_minutes": deep_sleep,
+        "light_sleep_minutes": light_sleep,
         "rem_sleep_minutes": rem_sleep,
+        "awake_count": int(awake_count) if awake_count is not None else None,
+        "sleep_stress_avg": float(sleep_stress_avg) if sleep_stress_avg is not None else None,
+        "sleep_score_insight": sleep_score_insight,
         "sleep_start": sleep_start,
         "sleep_end": sleep_end,
         "body_battery_max": int(bb_max) if bb_max is not None else None,
         "body_battery_min": int(bb_min) if bb_min is not None else None,
+        "body_battery_at_wake": int(bb_at_wake) if bb_at_wake is not None else None,
         "stress_avg": stats.get("averageStressLevel"),
         "steps": stats.get("totalSteps"),
         "spo2_avg": stats.get("averageSpo2"),

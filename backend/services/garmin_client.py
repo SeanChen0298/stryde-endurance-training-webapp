@@ -108,8 +108,9 @@ def _fetch_health_sync(tokens_json: str, for_date: date) -> dict:
     try:
         result["hrv"] = client.get_hrv_data(date_str)
     except Exception as e:
-        logger.warning(f"Garmin HRV fetch failed for {date_str}: {e}")
+        logger.warning(f"Garmin HRV fetch failed for {date_str}: {type(e).__name__}: {e}")
         result["hrv"] = {}
+        result["_hrv_error"] = f"{type(e).__name__}: {e}"
 
     try:
         result["rhr"] = client.get_rhr_day(date_str)
