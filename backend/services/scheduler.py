@@ -40,6 +40,14 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Phase 3: daily plan revision check at 07:00 MYT
+    _scheduler.add_job(
+        _daily_plan_revision,
+        CronTrigger(hour=7, minute=0),
+        id="daily_plan_revision",
+        replace_existing=True,
+    )
+
     _scheduler.start()
     logger.info("APScheduler started")
 
@@ -78,6 +86,34 @@ async def _daily_readiness_brief():
                     await generate_daily_brief(athlete_id, today, db, redis)
                 except Exception as exc:
                     logger.error(f"Daily brief failed for athlete {athlete_id}: {exc}")
+    finally:
+        await redis.aclose()
+
+
+async def _daily_plan_revision():
+    """Check and trigger training plan adaptive revision for all athletes with Gemini + active plan."""
+    from database import AsyncSessionLocal
+    from models.athlete import Athlete
+    from services.plan_service import check_revision_triggers
+    from sqlalchemy import select
+
+    import redis.asyncio as aioredis
+    from config import settings as cfg
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Athlete.id).where(Athlete.gemini_api_key_encrypted.is_not(None))
+        )
+        athlete_ids = [row[0] for row in result.fetchall()]
+
+    redis = await aioredis.from_url(cfg.REDIS_URL, decode_responses=True)
+    try:
+        for athlete_id in athlete_ids:
+            async with AsyncSessionLocal() as db:
+                try:
+                    await check_revision_triggers(athlete_id, db, redis)
+                except Exception as exc:
+                    logger.error(f"Plan revision check failed for athlete {athlete_id}: {exc}")
     finally:
         await redis.aclose()
 

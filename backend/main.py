@@ -63,13 +63,15 @@ async def external_api_handler(request: Request, exc: httpx.HTTPStatusError):
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from routers import auth, activities, dashboard, health, settings as settings_router
+from routers import auth, activities, dashboard, health, settings as settings_router, plans, calendar as calendar_router
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(activities.router, prefix="/activities", tags=["activities"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(settings_router.router, prefix="/settings", tags=["settings"])
+app.include_router(plans.router, prefix="/plans", tags=["plans"])
+app.include_router(calendar_router.router, prefix="/calendar", tags=["calendar"])
 
 
 @app.get("/health")

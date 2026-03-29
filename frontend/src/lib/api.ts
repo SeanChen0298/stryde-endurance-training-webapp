@@ -173,6 +173,59 @@ export interface HealthDayDetail {
   spo2_avg: number | null
 }
 
+export interface PlannedWorkoutOut {
+  id: string
+  plan_id: string
+  scheduled_date: string
+  workout_type: string
+  title: string
+  description: string | null
+  target_distance_meters: number | null
+  target_duration_minutes: number | null
+  target_pace_min_seconds_per_km: number | null
+  target_pace_max_seconds_per_km: number | null
+  target_hr_zone: number | null
+  target_rpe: number | null
+  intensity_points: number | null
+  completed: boolean
+  completed_activity_id: string | null
+}
+
+export interface TrainingPlanResponse {
+  id: string
+  created_at: string
+  valid_from: string
+  valid_to: string
+  goal_race_type: string | null
+  goal_race_date: string | null
+  goal_time_seconds: number | null
+  status: string
+  plan_summary: string | null
+  revision_reason: string | null
+  weekly_structure: Record<string, unknown> | null
+  workouts: PlannedWorkoutOut[]
+}
+
+export interface ActivitySummaryOut {
+  id: string
+  started_at: string
+  distance_km: number | null
+  pace_str: string | null
+  avg_hr: number | null
+  workout_type: string | null
+}
+
+export interface WeekDay {
+  date: string
+  planned: PlannedWorkoutOut | null
+  actual: ActivitySummaryOut | null
+}
+
+export interface WeekCalendarResponse {
+  week_start: string
+  days: WeekDay[]
+}
+
 // ── API surface ───────────────────────────────────────────────────────────────
 
 export const api = {
@@ -237,5 +290,21 @@ export const api = {
     testGeminiKey: (req: GeminiKeyRequest) =>
       apiFetch<{ status: string }>("/settings/gemini/test", { method: "POST", body: JSON.stringify(req) }),
     removeGeminiKey: () => apiFetch<{ status: string }>("/settings/gemini", { method: "DELETE" }),
+  },
+
+  plans: {
+    active: () => apiFetch<TrainingPlanResponse>("/plans/active"),
+    generate: () => apiFetch<{ status: string; message: string }>("/plans/generate", { method: "POST" }),
+    week: (start: string) => apiFetch<WeekCalendarResponse>(`/plans/workouts/week?start=${start}`),
+    month: (year: number, month: number) => apiFetch<PlannedWorkoutOut[]>(`/plans/workouts/month?year=${year}&month=${month}`),
+    completeWorkout: (id: string, activityId?: string) =>
+      apiFetch<PlannedWorkoutOut>(`/plans/workouts/${id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ activity_id: activityId ?? null }),
+      }),
+  },
+
+  calendar: {
+    exportUrl: () => `${BASE}/calendar/export.ics`,
   },
 }

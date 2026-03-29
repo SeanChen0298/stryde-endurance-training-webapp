@@ -17,3 +17,4 @@ cryptography==43.0.3
 google-genai>=1.0.0
 garminconnect
 cloudscraper
+icalendar==6.1.0
