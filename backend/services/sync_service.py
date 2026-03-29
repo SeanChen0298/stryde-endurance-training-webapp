@@ -137,12 +137,8 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
         sleep_start = datetime.fromtimestamp(sleep_dto["sleepStartTimestampGMT"] / 1000, tz=timezone.utc)
     if sleep_dto.get("sleepEndTimestampGMT"):
         sleep_end = datetime.fromtimestamp(sleep_dto["sleepEndTimestampGMT"] / 1000, tz=timezone.utc)
-    sleep_score = None
-    scores = sleep_raw.get("sleepScores") or {}
-    if isinstance(scores, dict):
-        sleep_score = scores.get("overall") or scores.get("totalScore")
-    elif isinstance(scores, list) and scores:
-        sleep_score = scores[0].get("value")
+    # sleepScores is inside dailySleepDTO, overall.value is the score
+    sleep_score = (sleep_dto.get("sleepScores") or {}).get("overall", {}).get("value")
 
     # HRV — nested under hrvSummary
     hrv_summary = hrv_raw.get("hrvSummary") or {}
@@ -158,10 +154,9 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
     if isinstance(resting_hr, float):
         resting_hr = int(resting_hr)
 
-    # Body battery
-    bb = stats.get("bodyBattery") or {}
-    bb_max = bb.get("charged") if isinstance(bb, dict) else None
-    bb_min = bb.get("drained") if isinstance(bb, dict) else None
+    # Body battery — flat fields in stats (not a nested dict)
+    bb_max = stats.get("bodyBatteryChargedValue") or stats.get("bodyBatteryHighestValue")
+    bb_min = stats.get("bodyBatteryDrainedValue") or stats.get("bodyBatteryLowestValue")
 
     return {
         "athlete_id": athlete_id,
@@ -180,7 +175,7 @@ def normalise_garmin_health_connect(raw: dict, for_date: date, athlete_id: str) 
         "stress_avg": stats.get("averageStressLevel"),
         "steps": stats.get("totalSteps"),
         "spo2_avg": stats.get("averageSpo2"),
-        "respiratory_rate": stats.get("averageRespiratoryRate"),
+        "respiratory_rate": stats.get("avgWakingRespirationValue") or stats.get("averageRespiratoryRate"),
         "training_readiness_score": stats.get("trainingReadinessScore"),
     }
 
