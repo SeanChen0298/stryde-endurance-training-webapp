@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Loader2, Download, RefreshCw, AlertCircle, CheckCircle, Calendar } from "lucide-react"
 import { api, type TrainingPlanResponse } from "@/lib/api"
 import { PageWrapper } from "@/components/PageWrapper"
+import { TabBar } from "@/components/TabBar"
 import { AIFeatureGate } from "@/components/AIFeatureGate"
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -289,8 +290,10 @@ export default function PlanPage() {
   })
 
   return (
-    <PageWrapper>
-      <div className="container" style={{ paddingTop: 24, paddingBottom: 100 }}>
+    <>
+      <TabBar />
+      <PageWrapper>
+      <div className="container page-content">
         <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, marginBottom: 20 }}>Training Plan</h1>
 
         <AIFeatureGate>
@@ -307,5 +310,6 @@ export default function PlanPage() {
         </AIFeatureGate>
       </div>
     </PageWrapper>
+    </>
   )
 }

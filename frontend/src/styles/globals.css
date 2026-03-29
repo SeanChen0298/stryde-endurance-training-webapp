@@ -133,6 +133,18 @@ body {
   z-index: 100;
 }
 
+.tab-bar-logo {
+  display: none;
+}
+
+.tab-bar-logo-text {
+  display: none;
+}
+
+.tab-bar-items {
+  display: contents;
+}
+
 .tab-item {
   display: flex;
   flex-direction: column;
@@ -163,8 +175,31 @@ body {
     padding-bottom: 0;
     padding-top: 0;
     box-shadow: 0 1px 0 var(--gray-100);
-    justify-content: flex-end;
+    justify-content: space-between;
+    padding-left: 24px;
     padding-right: 24px;
+    gap: 4px;
+  }
+
+  .tab-bar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .tab-bar-logo-text {
+    display: block;
+    font-size: var(--text-base);
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.02em;
+  }
+
+  .tab-bar-items {
+    display: flex;
+    align-items: center;
     gap: 4px;
   }
 

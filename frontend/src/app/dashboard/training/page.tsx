@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Check, Calendar } from "lucide-react"
 import Link from "next/link"
 import { api, type PlannedWorkoutOut, type ActivitySummaryOut } from "@/lib/api"
 import { PageWrapper } from "@/components/PageWrapper"
+import { TabBar } from "@/components/TabBar"
 
 // ── Workout type colours ──────────────────────────────────────────────────────
 
@@ -348,8 +349,10 @@ export default function TrainingPage() {
   const monthLabel = `${MONTH_NAMES[displayMonth - 1]} ${displayYear}`
 
   return (
-    <PageWrapper>
-      <div className="container" style={{ paddingTop: 24, paddingBottom: 100 }}>
+    <>
+      <TabBar />
+      <PageWrapper>
+      <div className="container page-content">
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--gray-900)" }}>Training</h1>
@@ -409,5 +412,6 @@ export default function TrainingPage() {
         }
       </div>
     </PageWrapper>
+    </>
   )
 }
