@@ -357,6 +357,10 @@ function GarminSection() {
     },
   })
 
+  const syncMutation = useMutation({
+    mutationFn: api.settings.syncGarmin,
+  })
+
   if (isLoading) return <div className="skeleton" style={{ height: 40 }} />
 
   if (garmin?.connected) {
@@ -383,14 +387,28 @@ function GarminSection() {
         <p className="body-text" style={{ marginBottom: 16 }}>
           Health data (HRV, sleep, body battery) syncs daily at 06:00 MYT.
         </p>
-        <button
-          className="btn-secondary"
-          style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--status-red)" }}
-          onClick={() => disconnectMutation.mutate()}
-          disabled={disconnectMutation.isPending}
-        >
-          <Trash2 size={14} /> Disconnect Garmin
-        </button>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button
+            className="btn-secondary"
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending || syncMutation.isSuccess}
+          >
+            {syncMutation.isPending
+              ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Syncing…</>
+              : syncMutation.isSuccess
+              ? <><CheckCircle size={14} color="var(--status-green)" /> Sync started</>
+              : "Sync now (last 90 days)"}
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--status-red)" }}
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+          >
+            <Trash2 size={14} /> Disconnect
+          </button>
+        </div>
       </div>
     )
   }
@@ -483,11 +501,11 @@ function GarminSection() {
               fontSize: "var(--text-xs)", color: "var(--gray-600)", marginBottom: 14, lineHeight: 1.7,
             }}
           >
-            <strong style={{ color: "var(--gray-900)" }}>Run this script on your own machine (not the server):</strong>
+            <strong style={{ color: "var(--gray-900)" }}>Run on your own machine (not the server) using the script at C:\Users\cheny\get_garmin_token.py:</strong>
             <pre style={{ margin: "8px 0 0", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", color: "var(--gray-900)" }}>
-              {`pip install garth\npython - <<'EOF'\nimport garth, getpass\nemail = input("Garmin email: ")\npwd = getpass.getpass("Password: ")\nclient = garth.Client()\nresult = client.login(email, pwd, return_on_mfa=True)\nif isinstance(result, tuple) and result[0] == "needs_mfa":\n    code = input("MFA code: ")\n    import garth.sso\n    garth.sso.resume_login(result[1]["client"], result[1]["signin_params"], code)\n    print(result[1]["client"].dumps())\nelse:\n    print(client.dumps())\nEOF`}
+              {`pip install garminconnect\npython get_garmin_token.py`}
             </pre>
-            Copy the output line and paste below.
+            Copy the JSON output and paste below.
           </div>
           <div style={{ marginBottom: 10 }}>
             <div className="metric-label" style={{ marginBottom: 6 }}>Email (for display)</div>

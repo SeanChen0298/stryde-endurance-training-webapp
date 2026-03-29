@@ -230,6 +230,7 @@ export const api = {
     connectGarminToken: (req: { token_json: string; email?: string }) =>
       apiFetch<{ status: string; email: string }>("/settings/garmin/token", { method: "POST", body: JSON.stringify(req) }),
     disconnectGarmin: () => apiFetch<{ status: string }>("/settings/garmin", { method: "DELETE" }),
+    syncGarmin: () => apiFetch<{ status: string }>("/settings/garmin/sync", { method: "POST" }),
     getGeminiStatus: () => apiFetch<{ connected: boolean; model: string | null }>("/settings/gemini"),
     saveGeminiKey: (req: GeminiKeyRequest) =>
       apiFetch<{ status: string; model: string }>("/settings/gemini", { method: "POST", body: JSON.stringify(req) }),

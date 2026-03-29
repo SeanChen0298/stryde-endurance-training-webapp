@@ -219,6 +219,18 @@ async def connect_garmin_token(
     return {"status": "connected", "email": athlete.garmin_email}
 
 
+@router.post("/garmin/sync")
+async def trigger_garmin_sync(
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+):
+    """Manually trigger a Garmin health data backfill for the last 90 days."""
+    if not athlete.garmin_tokens_encrypted:
+        raise HTTPException(status_code=400, detail="Garmin not connected")
+    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    return {"status": "sync_started"}
+
+
 @router.delete("/garmin")
 async def disconnect_garmin(
     athlete: Annotated[Athlete, Depends(get_current_athlete)],
