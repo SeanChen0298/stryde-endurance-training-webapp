@@ -78,9 +78,17 @@ def _fetch_health_sync(tokens_json: str, for_date: date) -> dict:
     garth_client = garth.Client()
     garth_client.loads(tokens_json)
 
+    # Hydrate profile cache — garminconnect uses garth.profile["displayName"] in API URLs.
+    # Without this, most endpoints get a malformed URL and return empty/error responses.
+    try:
+        display_name = garth_client.profile.get("displayName", "")
+    except Exception as e:
+        logger.warning(f"Could not fetch Garmin profile (display_name will be empty): {e}")
+        display_name = ""
+
     client = Garmin()
     client.garth = garth_client
-    client.display_name = ""
+    client.display_name = display_name
 
     date_str = for_date.isoformat()
     result = {}
@@ -88,25 +96,25 @@ def _fetch_health_sync(tokens_json: str, for_date: date) -> dict:
     try:
         result["stats"] = client.get_stats(date_str)
     except Exception as e:
-        logger.debug(f"Garmin stats fetch failed for {date_str}: {e}")
+        logger.warning(f"Garmin stats fetch failed for {date_str}: {e}")
         result["stats"] = {}
 
     try:
         result["sleep"] = client.get_sleep_data(date_str)
     except Exception as e:
-        logger.debug(f"Garmin sleep fetch failed for {date_str}: {e}")
+        logger.warning(f"Garmin sleep fetch failed for {date_str}: {e}")
         result["sleep"] = {}
 
     try:
         result["hrv"] = client.get_hrv_data(date_str)
     except Exception as e:
-        logger.debug(f"Garmin HRV fetch failed for {date_str}: {e}")
+        logger.warning(f"Garmin HRV fetch failed for {date_str}: {e}")
         result["hrv"] = {}
 
     try:
         result["rhr"] = client.get_rhr_day(date_str)
     except Exception as e:
-        logger.debug(f"Garmin RHR fetch failed for {date_str}: {e}")
+        logger.warning(f"Garmin RHR fetch failed for {date_str}: {e}")
         result["rhr"] = {}
 
     # Persist any refreshed tokens
@@ -121,9 +129,13 @@ def _fetch_activities_sync(tokens_json: str, start: date, end: date) -> list[dic
 
     garth_client = garth.Client()
     garth_client.loads(tokens_json)
+    try:
+        display_name = garth_client.profile.get("displayName", "")
+    except Exception:
+        display_name = ""
     client = Garmin()
     client.garth = garth_client
-    client.display_name = ""
+    client.display_name = display_name
 
     try:
         activities = client.get_activities_by_date(start.isoformat(), end.isoformat())

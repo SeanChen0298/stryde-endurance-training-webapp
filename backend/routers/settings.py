@@ -219,6 +219,24 @@ async def connect_garmin_token(
     return {"status": "connected", "email": athlete.garmin_email}
 
 
+@router.get("/garmin/debug")
+async def debug_garmin_fetch(
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return raw garminconnect response for today — for diagnosing field mapping."""
+    from services.garmin_client import get_valid_garmin_tokens, fetch_health_day
+    import datetime
+
+    tokens_json = await get_valid_garmin_tokens(athlete.id, db)
+    if not tokens_json:
+        raise HTTPException(status_code=400, detail="Garmin not connected")
+    today = datetime.date.today()
+    raw = await fetch_health_day(tokens_json, today)
+    raw.pop("_tokens", None)  # don't leak tokens in response
+    return raw
+
+
 @router.post("/garmin/sync")
 async def trigger_garmin_sync(
     athlete: Annotated[Athlete, Depends(get_current_athlete)],
