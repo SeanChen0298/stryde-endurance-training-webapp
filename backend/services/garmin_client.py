@@ -53,12 +53,14 @@ def _login_sync(email: str, password: str, mfa_code: str | None = None) -> str:
         raise
     except GarthException as exc:
         err = str(exc).lower()
-        if "invalid" in err or "incorrect" in err or "unauthorized" in err:
+        if "429" in err or "too many" in err or "rate" in err or "locked" in err or "temporarily" in err:
+            raise RuntimeError("RATE_LIMITED") from exc
+        if "invalid" in err or "incorrect" in err or "unauthorized" in err or "password" in err:
             raise ValueError("Invalid Garmin email or password") from exc
         raise RuntimeError(f"Garmin login failed: {exc}") from exc
     except Exception as exc:
         err = str(exc).lower()
-        if "429" in err or "too many requests" in err:
+        if "429" in err or "too many" in err or "rate limit" in err or "temporarily" in err or "locked" in err:
             raise RuntimeError("RATE_LIMITED") from exc
         if "mfa" in err or "2fa" in err or "two-factor" in err:
             raise ValueError("Garmin account has MFA enabled — provide your 6-digit code") from exc
