@@ -2,26 +2,77 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { format, parseISO } from "date-fns"
-import { Activity, TrendingUp } from "lucide-react"
+import { format, parseISO, differenceInDays } from "date-fns"
+import { Activity, Flag } from "lucide-react"
 import { api } from "@/lib/api"
 import { PageWrapper } from "@/components/PageWrapper"
 import { TabBar } from "@/components/TabBar"
-import { AIFeatureGate } from "@/components/AIFeatureGate"
 import { HRVSparkline } from "@/components/charts/HRVSparkline"
 import { SleepSparkline } from "@/components/charts/SleepSparkline"
+import { LoadTrendChart } from "@/components/charts/LoadTrendChart"
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: api.dashboard,
   })
+  const { data: profile } = useQuery({
+    queryKey: ["settings", "profile"],
+    queryFn: api.settings.getProfile,
+  })
+  const { data: loadTrend } = useQuery({
+    queryKey: ["load-trend"],
+    queryFn: () => api.loadTrend(60),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const daysToRace =
+    profile?.goal_race_date
+      ? differenceInDays(parseISO(profile.goal_race_date), new Date())
+      : null
 
   return (
     <>
       <TabBar />
       <PageWrapper>
         <div className="container page-content">
+
+          {/* Race countdown — shown when goal race is set and in the future */}
+          {profile?.goal_race_date && daysToRace !== null && daysToRace >= 0 && (
+            <div
+              style={{
+                background: "var(--accent)",
+                borderRadius: 14,
+                padding: "14px 18px",
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Flag size={18} color="white" />
+                <div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "rgba(255,255,255,0.75)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {profile.goal_race_type?.replace("_", " ") ?? "Race"} day
+                  </div>
+                  <div style={{ fontSize: "var(--text-sm)", color: "white", fontWeight: 600, marginTop: 1 }}>
+                    {format(parseISO(profile.goal_race_date), "d MMMM yyyy")}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "white", lineHeight: 1 }}>
+                  {daysToRace}
+                </div>
+                <div style={{ fontSize: "var(--text-xs)", color: "rgba(255,255,255,0.75)", marginTop: 1 }}>
+                  days to go
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Strava onboarding banner */}
           {data && !data.strava_connected && (
             <div
@@ -66,7 +117,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* AI onboarding banner (Phase 1 — no key set) */}
+          {/* AI onboarding banner */}
           {data && !data.gemini_connected && (
             <div
               style={{
@@ -106,7 +157,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Phase 2: Readiness ring + AI brief */}
+          {/* Readiness ring + AI brief (Phase 2) */}
           {data && data.readiness_score !== null && (
             <div className="card-grid" style={{ marginBottom: 0 }}>
               <div className="card card-half" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -118,14 +169,12 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* AI brief with headline */}
               <div className="card card-half">
                 <div className="metric-label" style={{ marginBottom: 6 }}>AI Brief</div>
                 {data.ai_brief ? (
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--gray-600)", lineHeight: 1.6 }}>
-                    {data.ai_brief.split("\n").filter(Boolean).map((line, i) => (
-                      <div key={i} style={{ marginBottom: 4 }}>{line}</div>
-                    ))}
-                  </div>
+                  <AiBriefCard brief={data.ai_brief} />
                 ) : (
                   <div style={{ fontSize: "var(--text-xs)", color: "var(--gray-400)" }}>
                     Brief generates at 06:05 MYT after your Garmin syncs.
@@ -154,10 +203,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+              {data && <DayBars dailyRuns={data.weekly_mileage.daily_runs} />}
+            </div>
 
-              {/* Day bars */}
-              {data && (
-                <DayBars dailyRuns={data.weekly_mileage.daily_runs} />
+            {/* Training load trend (CTL/ATL) */}
+            <div className="card card-full">
+              <div className="metric-label" style={{ marginBottom: 8 }}>Training load · 60 days</div>
+              {!loadTrend ? (
+                <div className="skeleton" style={{ height: 80 }} />
+              ) : (
+                <LoadTrendChart data={loadTrend} />
               )}
             </div>
 
@@ -181,15 +236,11 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* AI brief (Phase 2 — shown when no readiness ring already displayed above) */}
-            {(!data || data.readiness_score === null) && (
-              <div className="card-full">
-                <AIFeatureGate>
-                  <div className="card">
-                    <div className="card-title" style={{ marginBottom: 8 }}>AI Daily Brief</div>
-                    <div className="body-text">Brief will appear after your Garmin syncs.</div>
-                  </div>
-                </AIFeatureGate>
+            {/* AI brief fallback when no readiness ring */}
+            {(!data || data.readiness_score === null) && data?.gemini_connected && (
+              <div className="card card-full">
+                <div className="card-title" style={{ marginBottom: 8 }}>AI Daily Brief</div>
+                <div className="body-text">Brief will appear after your Garmin syncs.</div>
               </div>
             )}
 
@@ -275,6 +326,28 @@ export default function DashboardPage() {
         </div>
       </PageWrapper>
     </>
+  )
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function AiBriefCard({ brief }: { brief: string }) {
+  const lines = brief.split("\n").filter(Boolean)
+  // First non-empty line is the headline; rest is body
+  const [headline, ...body] = lines
+  return (
+    <div>
+      {headline && (
+        <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--gray-900)", marginBottom: body.length ? 6 : 0, lineHeight: 1.4 }}>
+          {headline}
+        </div>
+      )}
+      {body.map((line, i) => (
+        <div key={i} style={{ fontSize: "var(--text-xs)", color: "var(--gray-600)", lineHeight: 1.6, marginBottom: 3 }}>
+          {line}
+        </div>
+      ))}
+    </div>
   )
 }
 

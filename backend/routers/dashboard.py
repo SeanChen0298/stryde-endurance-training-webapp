@@ -3,10 +3,12 @@ Dashboard router — aggregated stats for the frontend overview page.
 Serves Phase 1 data: weekly mileage, recent activities, HRV/sleep trends.
 """
 
+import math
+from collections import defaultdict
 from datetime import datetime, timedelta, date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,3 +189,76 @@ async def get_dashboard(
         readiness_label=readiness_label,
         ai_brief=ai_brief,
     )
+
+
+# ── Training load trend ────────────────────────────────────────────────────────
+
+class LoadPoint(BaseModel):
+    date: str
+    distance_km: float
+    ctl: float   # chronic training load — 42-day exp. moving average of daily km
+    atl: float   # acute training load  —  7-day exp. moving average of daily km
+    tsb: float   # training stress balance (CTL − ATL); positive = fresh
+
+
+@router.get("/load-trend", response_model=list[LoadPoint])
+async def get_load_trend(
+    athlete: Annotated[Athlete, Depends(get_current_athlete)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    days: int = Query(60, ge=7, le=180),
+):
+    """
+    Return per-day training load with CTL/ATL/TSB for the past `days` days.
+    Uses daily run km as the load proxy; CTL/ATL are exponential moving averages.
+    # Uses internal schema only — not Strava API data
+    """
+    warmup = 42  # extra days before the output window to seed CTL accurately
+    cutoff = datetime.utcnow() - timedelta(days=days + warmup)
+
+    result = await db.execute(
+        select(Activity).where(
+            Activity.athlete_id == athlete.id,
+            Activity.activity_type == "run",
+            Activity.started_at >= cutoff,
+        ).order_by(Activity.started_at)
+    )
+    activities = result.scalars().all()
+
+    daily_load: dict = defaultdict(float)
+    for a in activities:
+        d = a.started_at.date()
+        daily_load[d] += meters_to_km(a.distance_meters or 0)
+
+    ctl_k = 1 - math.exp(-1 / 42)
+    atl_k = 1 - math.exp(-1 / 7)
+    ctl = 0.0
+    atl = 0.0
+
+    today = date.today()
+    output_start = today - timedelta(days=days - 1)
+    warmup_start = today - timedelta(days=days + warmup - 1)
+
+    # Warm-up pass — not included in output
+    current = warmup_start
+    while current < output_start:
+        load = daily_load.get(current, 0.0)
+        ctl += ctl_k * (load - ctl)
+        atl += atl_k * (load - atl)
+        current += timedelta(days=1)
+
+    # Output pass
+    points: list[LoadPoint] = []
+    while current <= today:
+        load = daily_load.get(current, 0.0)
+        ctl += ctl_k * (load - ctl)
+        atl += atl_k * (load - atl)
+        points.append(LoadPoint(
+            date=str(current),
+            distance_km=round(load, 1),
+            ctl=round(ctl, 1),
+            atl=round(atl, 1),
+            tsb=round(ctl - atl, 1),
+        ))
+        current += timedelta(days=1)
+
+    return points
