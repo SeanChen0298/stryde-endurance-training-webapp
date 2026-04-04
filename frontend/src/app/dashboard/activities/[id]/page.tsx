@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Zap, Heart, Clock, TrendingUp } from "lucide-react"
 import { api } from "@/lib/api"
 import { PageWrapper } from "@/components/PageWrapper"
 import { TabBar } from "@/components/TabBar"
+import { SplitChart } from "@/components/charts/SplitChart"
 
 const HR_ZONE_COLORS = ["#93C5FD", "#6EE7B7", "#FCD34D", "#F97316", "#EF4444"]
 const HR_ZONE_LABELS = ["Zone 1", "Zone 2", "Zone 3", "Zone 4", "Zone 5"]
@@ -137,10 +138,13 @@ export default function ActivityDetailPage() {
             </div>
           )}
 
-          {/* Splits table */}
+          {/* Splits chart + table */}
           {activity.splits && activity.splits.length > 0 && (
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-title" style={{ marginBottom: 12 }}>Per-km Splits</div>
+              <div style={{ marginBottom: 16 }}>
+                <SplitChart splits={activity.splits} />
+              </div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>

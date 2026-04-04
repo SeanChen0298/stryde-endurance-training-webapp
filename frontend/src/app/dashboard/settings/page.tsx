@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Eye, EyeOff, CheckCircle, Loader2, Trash2, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, CheckCircle, Loader2, Trash2, AlertCircle, Pencil } from "lucide-react"
 import { api, APIError } from "@/lib/api"
 import { applyTheme, THEMES, type ThemeKey } from "@/lib/theme"
 import { PageWrapper } from "@/components/PageWrapper"
@@ -59,30 +59,7 @@ export default function SettingsPage() {
 
           {/* Profile section */}
           <Section title="Profile">
-            {profile && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div>
-                  <div className="metric-label" style={{ marginBottom: 4 }}>Name</div>
-                  <div style={{ fontSize: "var(--text-base)", color: "var(--gray-900)" }}>{profile.name}</div>
-                </div>
-                <div>
-                  <div className="metric-label" style={{ marginBottom: 4 }}>Email</div>
-                  <div style={{ fontSize: "var(--text-base)", color: "var(--gray-900)" }}>{profile.email}</div>
-                </div>
-                <div>
-                  <div className="metric-label" style={{ marginBottom: 4 }}>Timezone</div>
-                  <div style={{ fontSize: "var(--text-base)", color: "var(--gray-900)" }}>{profile.timezone}</div>
-                </div>
-                {profile.goal_race_date && (
-                  <div>
-                    <div className="metric-label" style={{ marginBottom: 4 }}>Goal race</div>
-                    <div style={{ fontSize: "var(--text-base)", color: "var(--gray-900)" }}>
-                      {profile.goal_race_type?.replace("_", " ")} · {profile.goal_race_date}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            <ProfileSection />
           </Section>
 
           {/* AI Configuration */}
@@ -292,6 +269,166 @@ export default function SettingsPage() {
         </div>
       </PageWrapper>
     </>
+  )
+}
+
+function ProfileSection() {
+  const queryClient = useQueryClient()
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["settings", "profile"],
+    queryFn: api.settings.getProfile,
+  })
+
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState("")
+  const [timezone, setTimezone] = useState("")
+  const [raceType, setRaceType] = useState("")
+  const [raceDate, setRaceDate] = useState("")
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (profile && !editing) {
+      setName(profile.name ?? "")
+      setTimezone(profile.timezone ?? "")
+      setRaceType(profile.goal_race_type ?? "")
+      setRaceDate(profile.goal_race_date ?? "")
+    }
+  }, [profile, editing])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      api.settings.updateProfile({
+        name: name || undefined,
+        timezone: timezone || undefined,
+        goal_race_type: raceType || undefined,
+        goal_race_date: raceDate || undefined,
+      } as Parameters<typeof api.settings.updateProfile>[0]),
+    onSuccess: () => {
+      setEditing(false)
+      setSaved(true)
+      setSaveError(null)
+      queryClient.invalidateQueries({ queryKey: ["settings", "profile"] })
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      setTimeout(() => setSaved(false), 3000)
+    },
+    onError: (err) => {
+      if (err instanceof APIError) setSaveError(err.message)
+    },
+  })
+
+  if (isLoading) return <div className="skeleton" style={{ height: 120 }} />
+
+  if (!profile) return null
+
+  if (!editing) {
+    return (
+      <div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Row label="Name" value={profile.name ?? "—"} />
+          <Row label="Email" value={profile.email} />
+          <Row label="Timezone" value={profile.timezone} />
+          {profile.goal_race_type && (
+            <Row
+              label="Goal race"
+              value={`${profile.goal_race_type.replace("_", " ")}${profile.goal_race_date ? " · " + profile.goal_race_date : ""}`}
+            />
+          )}
+        </div>
+        <button
+          className="btn-secondary"
+          style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 16 }}
+          onClick={() => setEditing(true)}
+        >
+          <Pencil size={13} /> Edit profile
+        </button>
+        {saved && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: "var(--text-xs)", color: "var(--status-green)" }}>
+            <CheckCircle size={13} /> Saved
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div className="metric-label" style={{ marginBottom: 6 }}>Name</div>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+      </div>
+      <div>
+        <div className="metric-label" style={{ marginBottom: 6 }}>Email</div>
+        <div style={{ fontSize: "var(--text-base)", color: "var(--gray-400)", padding: "13px 16px" }}>{profile.email}</div>
+      </div>
+      <div>
+        <div className="metric-label" style={{ marginBottom: 6 }}>Timezone</div>
+        <input className="input" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Asia/Kuala_Lumpur" />
+      </div>
+      <div>
+        <div className="metric-label" style={{ marginBottom: 6 }}>Goal race type</div>
+        <select
+          className="input"
+          value={raceType}
+          onChange={(e) => setRaceType(e.target.value)}
+          style={{ appearance: "none" }}
+        >
+          <option value="">— None —</option>
+          <option value="5k">5K</option>
+          <option value="10k">10K</option>
+          <option value="half_marathon">Half Marathon</option>
+          <option value="marathon">Marathon</option>
+          <option value="ultra">Ultra</option>
+        </select>
+      </div>
+      <div>
+        <div className="metric-label" style={{ marginBottom: 6 }}>Goal race date</div>
+        <input
+          className="input"
+          type="date"
+          value={raceDate}
+          onChange={(e) => setRaceDate(e.target.value)}
+        />
+      </div>
+
+      {saveError && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 12px", fontSize: "var(--text-sm)", color: "#B91C1C" }}>
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          {saveError}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          className="btn-primary"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+        >
+          {saveMutation.isPending
+            ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Saving…</>
+            : "Save"}
+        </button>
+        <button
+          className="btn-secondary"
+          style={{ flex: 1 }}
+          onClick={() => { setEditing(false); setSaveError(null) }}
+          disabled={saveMutation.isPending}
+        >
+          Cancel
+        </button>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="metric-label" style={{ marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: "var(--text-base)", color: "var(--gray-900)" }}>{value}</div>
+    </div>
   )
 }
 

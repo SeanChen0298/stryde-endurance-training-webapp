@@ -144,6 +144,14 @@ export interface GarminStatus {
   email: string | null
 }
 
+export interface LoadPoint {
+  date: string
+  distance_km: number
+  ctl: number
+  atl: number
+  tsb: number
+}
+
 export interface ReadinessPoint {
   date: string
   score: number | null
@@ -248,6 +256,7 @@ export const api = {
   },
 
   dashboard: () => apiFetch<DashboardData>("/dashboard"),
+  loadTrend: (days = 60) => apiFetch<LoadPoint[]>(`/dashboard/load-trend?days=${days}`),
 
   activities: {
     list: (params?: { page?: number; per_page?: number; activity_type?: string; workout_type?: string }) => {
