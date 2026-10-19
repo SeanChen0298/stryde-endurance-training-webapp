@@ -11,8 +11,12 @@ class Settings(BaseSettings):
     GEMINI_PRIMARY_MODEL: str = "gemini-2.5-flash"
     GEMINI_FAST_MODEL: str = "gemini-2.5-flash-lite"
 
-    STRAVA_CLIENT_ID: str
-    STRAVA_CLIENT_SECRET: str
+    # Strava is switched off: its 2026 API Policy bars using Strava data in AI
+    # features (s5.3) and keeping it longer than 7 days (s6.2). Runs come from
+    # Garmin instead. The Strava code stays so it can be re-enabled deliberately.
+    STRAVA_ENABLED: bool = False
+    STRAVA_CLIENT_ID: str = ""
+    STRAVA_CLIENT_SECRET: str = ""
     STRAVA_WEBHOOK_CALLBACK_URL: str = ""
 
     GARMIN_CLIENT_ID: str = ""       # optional — app degrades gracefully if empty

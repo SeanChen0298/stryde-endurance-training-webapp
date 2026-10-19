@@ -2,7 +2,7 @@
 APScheduler job definitions for background tasks.
 
 Phase 1 jobs:
-- Daily Garmin health sync (06:00 MYT)
+- Daily Garmin sync (06:00 MYT): last 7 days of activities, last 3 days of health
 
 Phase 2+ jobs (stubs, activated when AI is configured):
 - Daily readiness brief generation (06:05 MYT)
@@ -24,7 +24,7 @@ def start_scheduler():
     global _scheduler
     _scheduler = AsyncIOScheduler(timezone="Asia/Kuala_Lumpur")
 
-    # Phase 1: nightly Garmin health data sync at 06:00 MYT
+    # Phase 1: daily Garmin activity + health sync at 06:00 MYT
     _scheduler.add_job(
         _daily_garmin_sync,
         CronTrigger(hour=6, minute=0),
@@ -119,10 +119,10 @@ async def _daily_plan_revision():
 
 
 async def _daily_garmin_sync():
-    """Sync Garmin health data for all athletes with Garmin credentials stored."""
+    """Light daily Garmin sync (activities + health) for all athletes with Garmin connected."""
     from database import AsyncSessionLocal
     from models.athlete import Athlete
-    from services.sync_service import trigger_garmin_backfill
+    from services.sync_service import trigger_garmin_daily_sync
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
@@ -133,6 +133,6 @@ async def _daily_garmin_sync():
 
     for athlete_id in athlete_ids:
         try:
-            await trigger_garmin_backfill(athlete_id)
+            await trigger_garmin_daily_sync(athlete_id)
         except Exception as e:
             logger.error(f"Garmin sync failed for athlete {athlete_id}: {e}")

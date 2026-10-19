@@ -15,6 +15,15 @@ from utils.jwt import create_access_token, verify_password
 
 router = APIRouter()
 
+
+def require_strava_enabled() -> None:
+    """Strava routes answer 410 Gone while the integration is switched off."""
+    if not settings.STRAVA_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Strava integration is switched off. Runs now come from Garmin.",
+        )
+
 STRAVA_AUTH_URL = (
     "https://www.strava.com/oauth/authorize"
     "?client_id={client_id}"
@@ -116,7 +125,7 @@ async def get_me(
 
 # ── Strava OAuth ──────────────────────────────────────────────────────────────
 
-@router.get("/strava/url")
+@router.get("/strava/url", dependencies=[Depends(require_strava_enabled)])
 async def strava_oauth_url(athlete: Annotated[Athlete, Depends(get_current_athlete)]):
     """Return the Strava OAuth URL for the frontend to redirect to."""
     redirect_uri = settings.STRAVA_WEBHOOK_CALLBACK_URL
@@ -130,7 +139,7 @@ async def strava_oauth_url(athlete: Annotated[Athlete, Depends(get_current_athle
     return {"url": url}
 
 
-@router.get("/strava")
+@router.get("/strava", dependencies=[Depends(require_strava_enabled)])
 async def strava_oauth_redirect(athlete: Annotated[Athlete, Depends(get_current_athlete)]):
     """Redirect user to Strava OAuth consent page."""
     redirect_uri = settings.STRAVA_WEBHOOK_CALLBACK_URL
@@ -144,7 +153,7 @@ async def strava_oauth_redirect(athlete: Annotated[Athlete, Depends(get_current_
     return RedirectResponse(url)
 
 
-@router.get("/strava/callback")
+@router.get("/strava/callback", dependencies=[Depends(require_strava_enabled)])
 async def strava_callback(
     code: str,
     athlete: Annotated[Athlete, Depends(get_current_athlete)],
@@ -209,7 +218,7 @@ async def garmin_oauth_redirect(athlete: Annotated[Athlete, Depends(get_current_
     raise HTTPException(status_code=501, detail="Garmin OAuth not yet implemented")
 
 
-@router.post("/webhooks/strava")
+@router.post("/webhooks/strava", dependencies=[Depends(require_strava_enabled)])
 async def strava_webhook(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     """Strava webhook event handler."""
     # Subscription validation challenge

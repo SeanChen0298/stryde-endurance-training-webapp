@@ -34,16 +34,23 @@ MOCK_STRAVA_ACTIVITY = {
     ],
 }
 
+# Shape returned by garminconnect 0.3 get_activities_by_date
 MOCK_GARMIN_ACTIVITY = {
     "activityId": 987654321,
-    "activityType": "running",
-    "startTimeInSeconds": 1718490600,       # some Unix timestamp
-    "durationInSeconds": 3600,
-    "distanceInMeters": 10000.0,
-    "totalElevationGainInMeters": 45.0,
-    "averageHeartRateInBeatsPerMinute": 148,
-    "maxHeartRateInBeatsPerMinute": 172,
-    "averageRunCadenceInStepsPerMinute": 174,
+    "activityName": "Kuala Lumpur Running",
+    "activityType": {"typeKey": "running"},
+    "startTimeGMT": "2026-10-17 22:30:00",
+    "startTimeLocal": "2026-10-18 06:30:00",
+    "duration": 3650.0,
+    "movingDuration": 3600.0,
+    "distance": 10000.0,
+    "elevationGain": 45.0,
+    "averageSpeed": 2.778,
+    "averageHR": 148.0,
+    "maxHR": 172.0,
+    "averageRunningCadenceInStepsPerMinute": 174.0,
+    "hrTimeInZone_1": 360, "hrTimeInZone_2": 2160, "hrTimeInZone_3": 900,
+    "hrTimeInZone_4": 180, "hrTimeInZone_5": 0,
 }
 
 
@@ -103,6 +110,31 @@ def test_garmin_activity_normalised():
     assert result["activity_type"] == "run"
     assert result["distance_meters"] == 10000.0
     assert result["avg_cadence"] == 174
+    assert result["started_at"] == datetime(2026, 10, 17, 22, 30, tzinfo=timezone.utc)
+    assert result["duration_seconds"] == 3600
+    assert result["avg_hr"] == 148
+    assert result["hr_zone_distribution"]["z2"] == 0.6
+
+
+@pytest.mark.parametrize("type_key,expected", [
+    ("treadmill_running", "run"),
+    ("trail_running", "run"),
+    ("virtual_run", "run"),
+    ("road_biking", "ride"),
+    ("strength_training", "strength_training"),
+    (None, "other"),
+])
+def test_garmin_activity_types(type_key, expected):
+    from services.sync_service import garmin_activity_type
+    assert garmin_activity_type(type_key) == expected
+
+
+def test_garmin_token_format_detection():
+    import json
+    from services.garmin_client import is_current_token_format
+    assert is_current_token_format(json.dumps({"di_token": "a", "di_refresh_token": "b", "di_client_id": "c"}))
+    assert not is_current_token_format("W3sib2F1dGhfdG9rZW4iOiAiYWJjIn1d")  # old garth base64 dump
+    assert not is_current_token_format(None)
 
 
 def test_pace_display():

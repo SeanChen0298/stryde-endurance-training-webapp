@@ -79,33 +79,91 @@ def normalise_strava_activity(raw: dict, athlete_id: str) -> dict:
     }
 
 
+# Garmin activityType.typeKey values that count as a run. Garmin splits running
+# into many sub-types (treadmill, trail, track, virtual...).
+GARMIN_RUN_TYPE_KEYS = {
+    "running", "street_running", "treadmill_running", "trail_running",
+    "track_running", "indoor_running", "virtual_run", "ultra_run", "obstacle_run",
+}
+GARMIN_RIDE_TYPE_KEYS = {
+    "cycling", "road_biking", "mountain_biking", "gravel_cycling", "indoor_cycling",
+    "virtual_ride", "e_bike_fitness", "e_bike_mountain", "cyclocross", "track_cycling",
+}
+
+
+def garmin_activity_type(type_key: str | None) -> str:
+    """Map a Garmin typeKey to Stryde's activity_type ('run', 'ride', or the raw key)."""
+    key = (type_key or "").lower()
+    if key in GARMIN_RUN_TYPE_KEYS or key.endswith("_running"):
+        return "run"
+    if key in GARMIN_RIDE_TYPE_KEYS or key.endswith("_cycling"):
+        return "ride"
+    return key or "other"
+
+
+def _parse_garmin_gmt(value: str | None) -> datetime | None:
+    """Garmin startTimeGMT looks like '2026-10-18 22:12:03' (UTC, no zone marker)."""
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _garmin_hr_zones(raw: dict) -> dict | None:
+    """Turn hrTimeInZone_1..5 (seconds) into fractions {z1: 0.15, ...}."""
+    seconds = {f"z{i}": raw.get(f"hrTimeInZone_{i}") for i in range(1, 6)}
+    if all(v is None for v in seconds.values()):
+        return None
+    total = sum(v or 0 for v in seconds.values())
+    if total <= 0:
+        return None
+    return {k: round((v or 0) / total, 3) for k, v in seconds.items()}
+
+
 def normalise_garmin_activity(raw: dict, athlete_id: str) -> dict:
     """
-    Map a Garmin activity to the internal activities schema.
-    # Uses internal schema only — not Garmin API data (passed to AI layer)
+    Map a Garmin Connect activity summary (garminconnect get_activities_by_date)
+    to the internal activities schema.
     """
-    start_ts = raw.get("startTimeInSeconds", 0)
-    started_at = datetime.fromtimestamp(start_ts, tz=timezone.utc)
+    started_at = _parse_garmin_gmt(raw.get("startTimeGMT"))
+    if started_at is None:
+        raise ValueError(f"Garmin activity {raw.get('activityId')} has no usable startTimeGMT")
 
-    distance_m = raw.get("distanceInMeters", 0)
-    duration_s = raw.get("durationInSeconds", 0)
-    avg_pace_s_per_km = (duration_s / (distance_m / 1000)) if distance_m > 0 else None
+    distance_m = raw.get("distance") or 0
+    duration_s = raw.get("movingDuration") or raw.get("duration") or 0
+
+    avg_speed_mps = raw.get("averageSpeed") or 0
+    if avg_speed_mps > 0:
+        avg_pace_s_per_km = 1000 / avg_speed_mps
+    elif distance_m > 0 and duration_s > 0:
+        avg_pace_s_per_km = duration_s / (distance_m / 1000)
+    else:
+        avg_pace_s_per_km = None
+
+    cadence = raw.get("averageRunningCadenceInStepsPerMinute")
+    avg_hr = raw.get("averageHR")
+    max_hr = raw.get("maxHR")
+    avg_power = raw.get("avgPower")
 
     return {
         "athlete_id": athlete_id,
         "source": "garmin",
-        "external_id": str(raw.get("activityId", "")),
-        "activity_type": raw.get("activityType", "running").lower().replace("running", "run"),
+        "external_id": str(raw["activityId"]),
+        "activity_type": garmin_activity_type((raw.get("activityType") or {}).get("typeKey")),
         "started_at": started_at,
-        "duration_seconds": duration_s,
-        "distance_meters": distance_m,
-        "elevation_gain_meters": raw.get("totalElevationGainInMeters"),
-        "avg_hr": raw.get("averageHeartRateInBeatsPerMinute"),
-        "max_hr": raw.get("maxHeartRateInBeatsPerMinute"),
+        "duration_seconds": int(duration_s) if duration_s else None,
+        "distance_meters": float(distance_m) if distance_m else None,
+        "elevation_gain_meters": raw.get("elevationGain"),
+        "avg_hr": int(round(avg_hr)) if avg_hr is not None else None,
+        "max_hr": int(round(max_hr)) if max_hr is not None else None,
         "avg_pace_seconds_per_km": avg_pace_s_per_km,
-        "avg_cadence": raw.get("averageRunCadenceInStepsPerMinute"),
-        "avg_power": raw.get("averagePowerInWatts"),
-        "hr_zone_distribution": None,
+        "avg_cadence": int(round(cadence)) if cadence is not None else None,  # already steps/min, both feet
+        "avg_power": int(round(avg_power)) if avg_power is not None else None,
+        "hr_zone_distribution": _garmin_hr_zones(raw),
         "splits": None,
         "workout_type": None,
         "perceived_effort": None,
@@ -227,7 +285,10 @@ async def upsert_health_metrics(data: dict, db) -> None:
 # ── Sync functions ────────────────────────────────────────────────────────────
 
 async def sync_single_strava_activity(strava_owner_id: str, activity_id: int) -> None:
-    """Called by webhook when a new Strava activity is created."""
+    """Called by webhook when a new Strava activity is created. No-op while Strava is switched off."""
+    from config import settings
+    if not settings.STRAVA_ENABLED:
+        return
     from models.athlete import Athlete
     from services.strava_client import get_valid_strava_client
 
@@ -254,7 +315,10 @@ async def sync_single_strava_activity(strava_owner_id: str, activity_id: int) ->
 
 
 async def trigger_strava_backfill(athlete_id: str) -> None:
-    """Backfill last 90 days of Strava activities for a newly connected athlete."""
+    """Backfill last 90 days of Strava activities. No-op while Strava is switched off."""
+    from config import settings
+    if not settings.STRAVA_ENABLED:
+        return
     from services.strava_client import get_valid_strava_client
     import time
 
@@ -292,34 +356,100 @@ async def trigger_strava_backfill(athlete_id: str) -> None:
             await client.close()
 
 
+# ── Garmin sync ───────────────────────────────────────────────────────────────
+
+GARMIN_BACKFILL_HEALTH_DAYS = 90
+GARMIN_BACKFILL_ACTIVITY_DAYS = 365
+GARMIN_DAILY_HEALTH_DAYS = 3      # re-fetch a few days: Garmin fills sleep/HRV in late
+GARMIN_DAILY_ACTIVITY_DAYS = 7
+
+
+def athlete_today() -> date:
+    """Today in the athlete's timezone (the server runs on UTC)."""
+    from zoneinfo import ZoneInfo
+    from config import settings
+    return datetime.now(ZoneInfo(settings.ATHLETE_TIMEZONE)).date()
+
+
+async def sync_garmin_health(athlete_id: str, days: int, db) -> int:
+    """Fetch and store health metrics for the last `days` days (including today)."""
+    from services.garmin_client import get_valid_garmin_tokens, fetch_health_range, save_refreshed_tokens
+
+    tokens_json = await get_valid_garmin_tokens(athlete_id, db)
+    if not tokens_json:
+        logger.debug(f"Garmin health sync skipped for {athlete_id} — not connected")
+        return 0
+
+    end = athlete_today()
+    start = end - timedelta(days=days - 1)
+    by_date, refreshed = await fetch_health_range(tokens_json, start, end)
+
+    stored = 0
+    for day, raw in sorted(by_date.items()):
+        data = normalise_garmin_health_connect(raw, day, athlete_id)
+        if any(v is not None for k, v in data.items() if k not in ("athlete_id", "recorded_date")):
+            await upsert_health_metrics(data, db)
+            stored += 1
+
+    if refreshed and refreshed != tokens_json:
+        await save_refreshed_tokens(athlete_id, refreshed, db)
+    logger.info(f"Garmin health sync for {athlete_id}: {stored}/{len(by_date)} days with data")
+    return stored
+
+
+async def sync_garmin_activities(athlete_id: str, days: int, db) -> int:
+    """Fetch and store Garmin activities started in the last `days` days."""
+    from services.garmin_client import get_valid_garmin_tokens, fetch_activities, save_refreshed_tokens
+
+    tokens_json = await get_valid_garmin_tokens(athlete_id, db)
+    if not tokens_json:
+        logger.debug(f"Garmin activity sync skipped for {athlete_id} — not connected")
+        return 0
+
+    end = athlete_today()
+    start = end - timedelta(days=days - 1)
+    activities, refreshed = await fetch_activities(tokens_json, start, end)
+
+    stored = 0
+    for raw in activities:
+        try:
+            await upsert_activity(normalise_garmin_activity(raw, athlete_id), db)
+            stored += 1
+        except Exception as e:
+            logger.error(f"Failed to store Garmin activity {raw.get('activityId')}: {e}")
+
+    if refreshed and refreshed != tokens_json:
+        await save_refreshed_tokens(athlete_id, refreshed, db)
+    logger.info(f"Garmin activity sync for {athlete_id}: {stored}/{len(activities)} activities stored")
+    return stored
+
+
 async def trigger_garmin_backfill(athlete_id: str) -> None:
-    """Backfill 90 days of Garmin health data. Silently skips if not connected."""
-    from services.garmin_client import get_valid_garmin_tokens, fetch_health_day, save_refreshed_tokens
-
+    """Full backfill after connecting or a manual sync: 90 days of health, a year of activities."""
     async with AsyncSessionLocal() as db:
-        tokens_json = await get_valid_garmin_tokens(athlete_id, db)
-        if not tokens_json:
-            logger.debug(f"Garmin backfill skipped for {athlete_id} — not connected")
-            return
+        await sync_garmin_activities(athlete_id, GARMIN_BACKFILL_ACTIVITY_DAYS, db)
+        await sync_garmin_health(athlete_id, GARMIN_BACKFILL_HEALTH_DAYS, db)
 
-        start = date.today() - timedelta(days=90)
-        total = 0
-        refreshed_tokens = tokens_json
 
-        for i in range(91):  # 0..90 inclusive so today is covered
-            day = start + timedelta(days=i)
-            try:
-                raw = await fetch_health_day(refreshed_tokens, day)
-                refreshed_tokens = raw.get("_tokens", refreshed_tokens)
-                data = normalise_garmin_health_connect(raw, day, athlete_id)
-                if any(v is not None for k, v in data.items() if k not in ("athlete_id", "recorded_date")):
-                    await upsert_health_metrics(data, db)
-                    total += 1
-            except Exception as e:
-                logger.warning(f"Garmin health fetch failed for {athlete_id} on {day}: {e}")
+async def trigger_garmin_daily_sync(athlete_id: str) -> None:
+    """Light nightly sync: last few days of health and last week of activities."""
+    async with AsyncSessionLocal() as db:
+        await sync_garmin_activities(athlete_id, GARMIN_DAILY_ACTIVITY_DAYS, db)
+        await sync_garmin_health(athlete_id, GARMIN_DAILY_HEALTH_DAYS, db)
 
-        # Persist any refreshed tokens
-        if refreshed_tokens != tokens_json:
-            await save_refreshed_tokens(athlete_id, refreshed_tokens, db)
 
-        logger.info(f"Garmin health backfill complete for {athlete_id}: {total} days with data")
+# ── Strava removal ────────────────────────────────────────────────────────────
+
+async def delete_strava_data(athlete_id: str, db) -> int:
+    """Delete Strava-sourced activities and the stored Strava token. Returns activities deleted."""
+    from sqlalchemy import delete
+    from models.oauth import OAuthToken
+
+    result = await db.execute(
+        delete(Activity).where(Activity.athlete_id == athlete_id, Activity.source == "strava")
+    )
+    await db.execute(
+        delete(OAuthToken).where(OAuthToken.athlete_id == athlete_id, OAuthToken.provider == "strava")
+    )
+    await db.commit()
+    return result.rowcount or 0
