@@ -1,193 +1,103 @@
-# Stryde — Claude Code Guide
+# Stryde — Agent Guide
 
-> Read this file before generating any code. It supersedes the spec for execution decisions.
+> Read this before any change. It overrides `ENDURANCE_PLATFORM_SPEC.md` wherever they disagree.
+> The spec is background; this file and `ROADMAP.md` are the current truth.
 
----
+## What Stryde is
 
-## Project at a glance
+A single-user training and recovery platform for one athlete (the repo owner, Kuala Lumpur,
+timezone `Asia/Kuala_Lumpur`). It pulls runs and recovery data from Garmin, plans training around
+them with Gemini, and shows the athlete their own data. Costs $0/month to run.
 
-Personal endurance training platform for a single athlete (Muhammad Faizal, Penang, Malaysia).
-Consolidates Strava + Garmin data with Google Gemini AI coaching. **$0/month to run.**
-
-| Layer | Technology | Notes |
+| Layer | Technology | Where |
 |---|---|---|
-| Backend | FastAPI + Python 3.11 | `backend/` — `uvicorn main:app --reload` |
-| Frontend | Next.js 14 App Router + TypeScript | `frontend/` — `npm run dev` |
-| Database | Neon PostgreSQL (pgvector + TimescaleDB) | AWS ap-southeast-1 (Singapore) |
-| Cache | Upstash Redis | Rate limiting + daily quota counters |
-| AI | Google Gemini API | **User provides their own free key** — never in `.env` |
-| Hosting | Railway/Render (backend) + Vercel (frontend) | All free tier |
+| Backend | FastAPI, Python 3.11 | `backend/` — Railway |
+| Frontend | Next.js 14 App Router, TypeScript, React Query | `frontend/` — Vercel |
+| Database | Neon PostgreSQL | Alembic migrations in `backend/migrations/` |
+| Cache | Upstash Redis | rate limits, quota counters |
+| AI in the app | Google Gemini, user-provided key | never in `.env` |
+| Jobs | APScheduler, `backend/services/scheduler.py` | runs inside the backend |
 
----
+## Data sources
 
-## Repo layout
+- **Garmin Connect is the only data source**, for both activities and health
+  (HRV, sleep, resting HR, body battery). Access is through the unofficial
+  `python-garminconnect` library signing in to the owner's own account.
+- **Strava is switched off and must stay off.** Strava's API Policy (June 2026) forbids
+  using Strava data in any AI feature (§5.3, including putting it in a prompt), forbids search
+  indexes built from it (§5.5), and limits caching to 7 days (§6.2). Do not add Strava calls,
+  do not read `source = 'strava'` rows in any AI path, and do not re-enable it.
 
-```
-/
-├── backend/
-│   ├── main.py               ← FastAPI app entry point
-│   ├── config.py             ← All settings via pydantic-settings (reads backend/.env)
-│   ├── database.py           ← Async SQLAlchemy engine
-│   ├── dependencies.py       ← FastAPI Depends() helpers (DB, Redis, current_athlete)
-│   ├── models/               ← SQLAlchemy ORM models
-│   ├── routers/              ← One router per feature domain
-│   ├── services/             ← External API clients + business logic
-│   ├── utils/                ← Pure helpers (pace, hrv, jwt, encryption)
-│   ├── prompts/              ← Gemini prompt builders (Phase 2+)
-│   ├── migrations/           ← Alembic (run: alembic upgrade head)
-│   └── tests/                ← pytest tests for the 4 high-risk areas
-├── frontend/
-│   └── src/
-│       ├── app/              ← Next.js App Router pages
-│       ├── components/       ← Shared React components
-│       ├── lib/              ← api.ts, theme.ts, queryClient.ts
-│       └── styles/globals.css ← ALL design tokens live here
-├── scripts/
-│   └── seed.py               ← Run once to create the athlete user
-├── .env.example              ← Template — copy to backend/.env and fill in
-└── ENDURANCE_PLATFORM_SPEC.md ← Full product spec (reference only)
-```
+## What's built
 
----
+- Garmin health sync, health page, daily readiness score, Gemini morning brief
+- Gemini-written training plans, calendar view, rule-based plan revision
+  (`plan_service.check_revision_triggers`)
+- Activities list and detail pages
+- Settings: Gemini key, Garmin sign-in, manual sync
 
-## Critical rules — never violate these
+What's next lives in `ROADMAP.md`. Do not start work that isn't in an issue.
 
-### 1. Strava AI compliance
-Raw Strava API responses are written to `activities.raw_metadata` (JSONB) **and immediately discarded**.
-The AI layer (`prompts/`, `services/ai_service.py`) reads **only** from the normalised `activities` table.
-Never pass `raw_metadata` or anything from `strava_client.py` to a Gemini prompt.
-Add this comment at every compliance boundary:
-```python
-# Uses internal schema only — not Strava API data
+## Commands
+
+```bash
+# backend
+cd backend && pip install -r requirements.txt pytest
+pytest -q                        # must pass before any PR
+uvicorn main:app --reload        # local server, needs backend/.env
+
+# frontend
+cd frontend && npm ci
+npm run build                    # must pass before any PR
 ```
 
-### 2. Gemini key — never in .env
-Each user provides their own free key via the Settings page.
-It is AES-256-GCM encrypted (`utils/encryption.py`) before storage.
-`config.py` has `GEMINI_ENCRYPTION_KEY` (master AES key) but **not** `GEMINI_API_KEY`.
-Always decrypt with `utils/encryption.decrypt_api_key(athlete.gemini_api_key_encrypted)` at call time.
+CI (`.github/workflows/ci.yml`) runs both on every pull request. `main` is protected:
+changes land only through a pull request with green `backend` and `frontend` checks.
 
-### 3. Garmin is optional
-`GARMIN_CLIENT_ID` is empty during Phase 1. Code must degrade gracefully — never crash if Garmin creds are absent.
-Pattern: `if not settings.GARMIN_CLIENT_ID: return None / skip silently`.
+Tests import modules without a real database: `tests/conftest.py` sets dummy settings.
+Never call real Garmin, Gemini, GitHub or weather APIs in tests — use fakes.
 
-### 4. Single-user app
-No registration. One athlete seeded via `scripts/seed.py`. JWT in httpOnly cookie.
-All protected routes use `Depends(get_current_athlete)` from `dependencies.py`.
+## Rules — never break these
 
-### 5. Design system — CSS custom properties only
-All colour/typography tokens are CSS `var(--token)` from `frontend/src/styles/globals.css`.
-**Never hardcode hex values in React components.**
-Use the design tokens exactly as defined in `globals.css`.
+1. **No Strava.** See "Data sources" above.
+2. **No secrets or personal data in the repo.** No tokens, cookies, keys, `.env` files or data
+   exports. The Gemini key and Garmin tokens are stored AES-256-GCM encrypted
+   (`utils/encryption.py`) and decrypted only at call time.
+3. **Every external source is optional.** If Garmin or Gemini isn't connected, the app still
+   starts and the feature degrades quietly. Never crash on missing credentials.
+4. **Garmin politely.** One signed-in client per sync run, never a fresh sign-in per request.
+   Keep daily syncs small; full backfills only on connect or manual sync.
+5. **Single user.** No registration. Protected routes use `Depends(get_current_athlete)`.
+6. **Design tokens only.** Colours and type come from CSS variables in
+   `frontend/src/styles/globals.css`. No hex values in components.
+7. **AI drafts, rules decide.** Anything that changes the plan is decided by plain, tested
+   code. Gemini writes wording or a first draft that rules then check.
+8. **Stay inside your issue.** Touch only the files the issue names. If the issue is unclear or
+   contradicts this file, stop and say so in the issue instead of guessing.
+9. **Never edit the pipeline's own files:** `.github/`, `.claude/`, `CLAUDE.md`, `ROADMAP.md`.
+   Those belong to the owner.
 
----
+## How to build a change
 
-## Build phase status
+Order inside a feature: model → Alembic migration → service → router → frontend page.
 
-| Phase | Status | Key features |
-|---|---|---|
-| **Phase 1** | ✅ Built | DB schema, Strava/Garmin sync, dashboard, activities, settings |
-| **Phase 2** | ⬜ Next | Readiness score, Gemini daily brief, health dashboard |
-| **Phase 3** | ⬜ Planned | Training plan generation, adaptive revision, calendar |
-| **Phase 4** | ⬜ Planned | PMC chart, race predictor, segment analysis |
+- Backend router pattern: `APIRouter`, `Annotated[...]` dependencies, raise `HTTPException`.
+- Frontend data: React Query only, through `frontend/src/lib/api.ts`. No raw `fetch` in components.
+- A schema change is its own migration with a working downgrade.
 
----
+## Testing
 
-## Phase 2 — what to build next
+Every PR adds or updates tests for what it changes. Priorities:
 
-1. `services/readiness_service.py` — compute daily readiness score from HRV/sleep/load
-2. `services/gemini_client.py` + `services/rate_limiter.py` — from spec (already spec'd, not coded)
-3. `services/ai_service.py` — `generate_daily_brief()`
-4. `prompts/daily_brief.py` — prompt builder
-5. `routers/health.py` — `/health` (history), `/health/{date}` (day detail)
-6. Scheduler: add morning brief job at 06:05 MYT
-7. Frontend: `/dashboard/health` and `/dashboard/health/[date]` pages
-8. Upgrade `/dashboard` page.tsx to Phase 2 state (readiness ring + AI brief)
+- Rule logic: readiness, plan revision triggers, plan validation
+- Data normalisation for each Garmin payload (activities, sleep, HRV, stats)
+- Prompt builders: snapshot the generated prompt
+- Encryption round trip
+- API endpoints: status codes and response shape with a faked database layer
 
----
+## Definition of done
 
-## Execution order (from spec)
-
-Always follow this order within a phase. Do not skip ahead:
-1. Backend models (if new tables needed)
-2. Alembic migration
-3. Service layer
-4. Router
-5. Frontend page
-
----
-
-## Key patterns
-
-### FastAPI router pattern
-```python
-from typing import Annotated
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from database import get_db
-from dependencies import get_current_athlete
-from models.athlete import Athlete
-
-router = APIRouter()
-
-@router.get("/example")
-async def example(
-    athlete: Annotated[Athlete, Depends(get_current_athlete)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    ...
-```
-
-### Error response shape
-```python
-# Raise HTTPException — never return raw errors
-raise HTTPException(status_code=404, detail="Not found")
-# For AI errors: raise GeminiDailyLimitReached — handled globally in main.py
-```
-
-### Frontend data fetching
-```typescript
-// Always use React Query — never raw fetch in components
-const { data, isLoading } = useQuery({
-  queryKey: ["dashboard"],
-  queryFn: api.dashboard,
-})
-```
-
-### Theme-safe CSS
-```typescript
-// Good — uses design token
-<div style={{ color: "var(--accent)" }}>
-
-// Bad — hardcoded hex
-<div style={{ color: "#F97316" }}>
-```
-
----
-
-## Testing — only 4 areas
-
-Per spec, only test these high-risk areas:
-
-1. **Rate limiter** — token bucket logic (Phase 2, when `rate_limiter.py` is built)
-2. **Data normalisation** — `tests/test_normalisation.py` (exists)
-3. **Prompt builders** — snapshot test generated prompts (Phase 2+)
-4. **Encryption round-trip** — `tests/test_encryption.py` (exists)
-
-Run: `cd backend && pytest tests/ -v`
-
----
-
-## Environment variables
-
-All in `backend/.env` (copy from `.env.example`). Required for startup:
-- `DATABASE_URL` — Neon connection string (`postgresql+asyncpg://...`)
-- `REDIS_URL` — Upstash Redis (`rediss://...`)
-- `GEMINI_ENCRYPTION_KEY` — 32-byte hex, generate once
-- `JWT_SECRET` — random hex, generate once
-- `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET`
-
-Optional (app works without them):
-- `GARMIN_CLIENT_ID` / `GARMIN_CLIENT_SECRET` — Garmin sync disabled if absent
-- `GOOGLE_CALENDAR_*` — Phase 3 feature
-- `STRAVA_WEBHOOK_CALLBACK_URL` — needed for real-time webhook (can use ngrok for dev)
+- `pytest` and `npm run build` pass (CI shows both green)
+- The issue's own "done means" check is met and shown in the PR description
+- No secrets, no edits outside the issue's files
+- The PR description says what changed, how it was checked, and anything left open
