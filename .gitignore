@@ -225,3 +225,6 @@ out/
 # Local env overrides
 .env.local
 .env.*.local
+
+# curl cookie jars from local testing — never commit
+cookies.txt
