@@ -1,10 +1,10 @@
 # Runs the backend's morning jobs (Garmin sync → AI brief → plan revision).
-# The Render free instance sleeps when idle, so its in-app scheduler is off;
-# this workflow wakes it and calls POST /cron/daily instead.
+# The backend runs as Vercel serverless functions, so it has no in-app
+# scheduler; this workflow calls POST /cron/daily instead.
 #
 # Needs two repo secrets (Settings → Secrets and variables → Actions):
-#   BACKEND_URL  e.g. https://stryde-backend.onrender.com
-#   CRON_SECRET  same value as CRON_SECRET in the Render environment
+#   BACKEND_URL  e.g. https://stryde-backend.vercel.app
+#   CRON_SECRET  same value as CRON_SECRET in the backend's Vercel environment
 name: daily-jobs
 
 on:
@@ -30,7 +30,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # A sleeping free instance takes 30–60 s to start
+      # Warms the function so a cold start doesn't eat into the jobs' time limit
       - name: Wake backend
         if: steps.check.outputs.skip != 'true'
         run: |
@@ -41,7 +41,7 @@ jobs:
       - name: Start daily jobs
         if: steps.check.outputs.skip != 'true'
         run: |
-          curl --fail --silent --show-error --max-time 60 \
-            --retry 3 --retry-delay 10 --retry-all-errors \
+          # Runs the jobs inline; no retry so a slow run isn't started twice
+          curl --fail --silent --show-error --max-time 310 \
             -X POST -H "X-Cron-Secret: $CRON_SECRET" \
             "$BACKEND_URL/cron/daily"

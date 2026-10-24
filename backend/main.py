@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Off on Render, where the instance sleeps; the daily jobs run via POST /cron/daily
-    if settings.RUN_SCHEDULER:
+    # Off on Vercel, where nothing runs between requests; the daily jobs run via POST /cron/daily
+    if settings.RUN_SCHEDULER and not settings.VERCEL:
         from services.scheduler import start_scheduler
         start_scheduler()
 

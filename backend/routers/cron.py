@@ -1,19 +1,19 @@
 """
 Cron router — lets an external scheduler run the daily jobs.
 
-On Render's free tier the instance sleeps when idle, so APScheduler can't be
-relied on. .github/workflows/daily-jobs.yml wakes the backend and calls
-POST /cron/daily every morning instead.
+On Vercel nothing runs between requests, so APScheduler is off.
+.github/workflows/daily-jobs.yml calls POST /cron/daily every morning instead.
 """
 import asyncio
 import hmac
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 
 from config import settings
 from services.scheduler import run_daily_jobs
+from utils.background import run_after_response
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +27,8 @@ async def _run_daily_locked():
         await run_daily_jobs()
 
 
-@router.post("/daily", status_code=202)
-async def run_daily(
-    background_tasks: BackgroundTasks,
-    x_cron_secret: Annotated[str | None, Header()] = None,
-):
+@router.post("/daily")
+async def run_daily(x_cron_secret: Annotated[str | None, Header()] = None):
     # Endpoint is invisible unless CRON_SECRET is configured
     if not settings.CRON_SECRET:
         raise HTTPException(status_code=404, detail="Not found")
@@ -40,5 +37,6 @@ async def run_daily(
     if _daily_lock.locked():
         return {"status": "already running"}
 
-    background_tasks.add_task(_run_daily_locked)
-    return {"status": "started"}
+    # Inline on Vercel (request waits until the jobs finish), background elsewhere
+    await run_after_response(_run_daily_locked())
+    return {"status": "done" if settings.VERCEL else "started"}
