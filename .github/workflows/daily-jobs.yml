@@ -1,0 +1,47 @@
+# Runs the backend's morning jobs (Garmin sync → AI brief → plan revision).
+# The Render free instance sleeps when idle, so its in-app scheduler is off;
+# this workflow wakes it and calls POST /cron/daily instead.
+#
+# Needs two repo secrets (Settings → Secrets and variables → Actions):
+#   BACKEND_URL  e.g. https://stryde-backend.onrender.com
+#   CRON_SECRET  same value as CRON_SECRET in the Render environment
+name: daily-jobs
+
+on:
+  schedule:
+    - cron: "0 22 * * *"   # 22:00 UTC = 06:00 MYT
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BACKEND_URL: ${{ secrets.BACKEND_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Skip if secrets are not set
+        id: check
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::notice::BACKEND_URL or CRON_SECRET not set — skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A sleeping free instance takes 30–60 s to start
+      - name: Wake backend
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          curl --fail --silent --show-error --max-time 90 \
+            --retry 6 --retry-delay 15 --retry-all-errors \
+            "$BACKEND_URL/health"
+
+      - name: Start daily jobs
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            -X POST -H "X-Cron-Secret: $CRON_SECRET" \
+            "$BACKEND_URL/cron/daily"

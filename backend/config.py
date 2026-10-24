@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # In production set to your Vercel URL, e.g.: https://stryde.vercel.app
     ALLOWED_ORIGINS: str = "http://localhost:3001"
 
+    # In-process APScheduler. Set false on Render free tier (instance sleeps);
+    # the daily jobs are then triggered via POST /cron/daily with CRON_SECRET.
+    RUN_SCHEDULER: bool = True
+    CRON_SECRET: str = ""            # empty → /cron endpoints return 404
+
     ATHLETE_TIMEZONE: str = "Asia/Kuala_Lumpur"
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com/v1"
 

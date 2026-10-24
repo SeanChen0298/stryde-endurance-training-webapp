@@ -52,6 +52,15 @@ def start_scheduler():
     logger.info("APScheduler started")
 
 
+async def run_daily_jobs():
+    """Run the morning jobs in order. Used by POST /cron/daily when APScheduler is off."""
+    logger.info("Daily jobs started")
+    await _daily_garmin_sync()
+    await _daily_readiness_brief()
+    await _daily_plan_revision()
+    logger.info("Daily jobs finished")
+
+
 def stop_scheduler():
     global _scheduler
     if _scheduler and _scheduler.running:
