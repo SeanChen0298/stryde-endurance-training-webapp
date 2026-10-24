@@ -179,6 +179,10 @@ See the "Production Deployment" section below.
 
 The backend is a second Vercel project next to the frontend. `backend/vercel.json`
 routes every request to `backend/api/index.py`, which loads the FastAPI app.
+It also pins the function to `sin1` (Singapore), next to Neon and Upstash —
+Vercel's default is US East, which adds ~1 s per database connection.
+
+Forgot the login password? `cd backend && .venv/Scripts/python ../scripts/reset_password.py`
 
 1. [vercel.com](https://vercel.com) → **Add New → Project** → import this repo again
 2. Name it e.g. `stryde-backend`, set **Root Directory** to `backend`, Framework Preset **Other**
