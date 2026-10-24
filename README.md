@@ -11,7 +11,7 @@ A personal full-stack web platform consolidating Garmin + Strava data with Googl
 | Database | Neon PostgreSQL (pgvector + TimescaleDB) |
 | Cache | Upstash Redis |
 | AI | Google Gemini API (user-provided key) |
-| Hosting | Render (backend) + Vercel (frontend) |
+| Hosting | Vercel (backend serverless + frontend) |
 
 ## Quick Start
 

@@ -1,7 +1,6 @@
 """
 Training plans router — CRUD, generation, week/month views.
 """
-import asyncio
 import logging
 from datetime import date, datetime
 from typing import Annotated
@@ -14,6 +13,7 @@ from database import get_db
 from dependencies import get_current_athlete, get_redis
 from models.athlete import Athlete
 from models.plan import PlannedWorkout
+from utils.background import run_after_response
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -140,8 +140,7 @@ async def generate_plan(
         raise HTTPException(status_code=400, detail="Set a goal race type in Settings before generating a plan")
     if not athlete.goal_race_date:
         raise HTTPException(status_code=400, detail="Set a goal race date in Settings before generating a plan")
-    task = asyncio.create_task(_run_plan_generation(athlete.id))
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    await run_after_response(_run_plan_generation(athlete.id))
     return {"status": "generating", "message": "Plan generation started — check back in ~30 seconds"}
 
 

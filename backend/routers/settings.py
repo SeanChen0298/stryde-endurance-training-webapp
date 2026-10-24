@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from dependencies import get_current_athlete
 from models.athlete import Athlete
+from utils.background import run_after_response
 from utils.encryption import encrypt_api_key, decrypt_api_key
 
 router = APIRouter()
@@ -176,9 +177,7 @@ async def connect_garmin(
     athlete.garmin_tokens_encrypted = encrypt_api_key(tokens_json)
     await db.commit()
 
-    # Trigger async backfill — keep reference to prevent GC
-    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    await run_after_response(_run_garmin_backfill(str(athlete.id)))
 
     return {"status": "connected", "email": request.email}
 
@@ -213,8 +212,7 @@ async def connect_garmin_token(
     athlete.garmin_tokens_encrypted = encrypt_api_key(request.token_json.strip())
     await db.commit()
 
-    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    await run_after_response(_run_garmin_backfill(str(athlete.id)))
 
     return {"status": "connected", "email": athlete.garmin_email}
 
@@ -267,8 +265,7 @@ async def trigger_garmin_sync(
     """Manually trigger a Garmin health data backfill for the last 90 days."""
     if not athlete.garmin_tokens_encrypted:
         raise HTTPException(status_code=400, detail="Garmin not connected")
-    task = asyncio.create_task(_run_garmin_backfill(str(athlete.id)))
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    await run_after_response(_run_garmin_backfill(str(athlete.id)))
     return {"status": "sync_started"}
 
 

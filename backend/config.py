@@ -29,8 +29,12 @@ class Settings(BaseSettings):
     # In production set to your Vercel URL, e.g.: https://stryde.vercel.app
     ALLOWED_ORIGINS: str = "http://localhost:3001"
 
-    # In-process APScheduler. Set false on Render free tier (instance sleeps);
-    # the daily jobs are then triggered via POST /cron/daily with CRON_SECRET.
+    # Set to 1 by Vercel at runtime. Serverless: no APScheduler, no connection
+    # pool, and follow-up work runs before the response instead of after it.
+    VERCEL: bool = False
+
+    # In-process APScheduler (ignored on Vercel). The daily jobs can instead be
+    # triggered via POST /cron/daily with CRON_SECRET.
     RUN_SCHEDULER: bool = True
     CRON_SECRET: str = ""            # empty → /cron endpoints return 404
 

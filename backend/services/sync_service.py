@@ -6,17 +6,22 @@ All AI/analysis reads from the normalised activities table only.
 """
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone, date
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+from config import settings
 from database import AsyncSessionLocal
 from models.activity import Activity
 from models.health import HealthMetrics
 from models.gear import Gear
 
 logger = logging.getLogger(__name__)
+
+# Leaves headroom under Vercel's 300 s function limit for the rest of the request
+GARMIN_BACKFILL_BUDGET_SECONDS = 240
 
 
 # ── Normalisation helpers ─────────────────────────────────────────────────────
@@ -292,8 +297,12 @@ async def trigger_strava_backfill(athlete_id: str) -> None:
             await client.close()
 
 
-async def trigger_garmin_backfill(athlete_id: str) -> None:
-    """Backfill 90 days of Garmin health data. Silently skips if not connected."""
+async def trigger_garmin_backfill(athlete_id: str, days: int = 90) -> None:
+    """Backfill the last `days` days of Garmin health data. Silently skips if not connected.
+
+    Runs newest day first. On Vercel it stops at a time budget so the function
+    isn't killed mid-write; the most recent days are always covered first.
+    """
     from services.garmin_client import get_valid_garmin_tokens, fetch_health_day, save_refreshed_tokens
 
     async with AsyncSessionLocal() as db:
@@ -302,12 +311,16 @@ async def trigger_garmin_backfill(athlete_id: str) -> None:
             logger.debug(f"Garmin backfill skipped for {athlete_id} — not connected")
             return
 
-        start = date.today() - timedelta(days=90)
+        today = date.today()
+        deadline = time.monotonic() + GARMIN_BACKFILL_BUDGET_SECONDS if settings.VERCEL else None
         total = 0
         refreshed_tokens = tokens_json
 
-        for i in range(91):  # 0..90 inclusive so today is covered
-            day = start + timedelta(days=i)
+        for i in range(days + 1):  # 0..days inclusive so today is covered
+            if deadline and time.monotonic() > deadline:
+                logger.warning(f"Garmin backfill for {athlete_id} hit time budget after {i} of {days + 1} days")
+                break
+            day = today - timedelta(days=i)
             try:
                 raw = await fetch_health_day(refreshed_tokens, day)
                 refreshed_tokens = raw.get("_tokens", refreshed_tokens)

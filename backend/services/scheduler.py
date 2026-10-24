@@ -128,7 +128,7 @@ async def _daily_plan_revision():
 
 
 async def _daily_garmin_sync():
-    """Sync Garmin health data for all athletes with Garmin credentials stored."""
+    """Sync the last 3 days of Garmin health data (full backfill runs on connect / manual sync)."""
     from database import AsyncSessionLocal
     from models.athlete import Athlete
     from services.sync_service import trigger_garmin_backfill
@@ -142,6 +142,6 @@ async def _daily_garmin_sync():
 
     for athlete_id in athlete_ids:
         try:
-            await trigger_garmin_backfill(athlete_id)
+            await trigger_garmin_backfill(athlete_id, days=3)
         except Exception as e:
             logger.error(f"Garmin sync failed for athlete {athlete_id}: {e}")
